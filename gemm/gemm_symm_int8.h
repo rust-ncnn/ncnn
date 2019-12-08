@@ -1,4 +1,3 @@
-#if __ARM_NEON
 #if __aarch64__
 
 #define DECOMPOSE_K\
@@ -271,7 +270,7 @@ static void reorder_b(const int8_t* b, int8_t* sb, const int k, const int n, con
     }
 }
 
-static void reorder_a_c(int8_t* a, int8_t* sa, int m, const int k, const int ldx) {
+static void reorder_a(int8_t* a, int8_t* sa, int m, const int k, const int ldx) {
     int i = 0;
     for (; i + 3 < m; i += 4) {
         int8_t *p0 = a;
@@ -434,7 +433,7 @@ static void reorder_a_c(int8_t* a, int8_t* sa, int m, const int k, const int ldx
     }
 }
 
-void int8kernel_m1(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int ldc, float* scales, float* bias) {
+void int8kernel_m1(void* dst, int8_t* sa, int8_t* sb, int, int k, int n, int, float* scales, float* bias) {
     void *pc = dst;
     int8_t *pa = sa;
     int8_t *pb = sb;
@@ -442,10 +441,9 @@ void int8kernel_m1(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
     DECOMPOSE_K
     DECOMPOSE_N
 
-    // int8_t* pTmp = (int8_t*)fastMalloc(16);
     if (n4 > 0) {
         asm volatile(
-        "m1_loopnd4:   \n"
+        "9:                               \n"
         "    eor v8.16b, v8.16b, v8.16b   \n"
         "    eor v9.16b, v9.16b, v9.16b   \n"
         "    eor v10.16b, v10.16b, v10.16b\n"
@@ -454,12 +452,12 @@ void int8kernel_m1(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "    mov x8, %0  // PanelA\n"
         
         "    cmp %w4, #0       \n"
-        "    beq m1_loopkd4_nd4\n"
+        "    beq 1f            \n"
         
         "    mov w19, %w4      \n"
         
         "    cmp %w3, #0       \n"
-        "    beq m1_loopkd8_nd4_even // loop number is even \n"
+        "    beq 2f// loop number is even \n"
         
         "    // start loopm1_kd8_nd4\n"
         "    subs w19, w19, #1        \n"
@@ -475,10 +473,10 @@ void int8kernel_m1(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "    smull v0.8h, v7.8b, v2.8b  \n"
         "    saddlp v11.4s, v0.8h       \n"
         
-        "    cmp w19, #0           \n"
-        "    beq m1_loopkd8_nd4_end\n"
+        "    cmp w19, #0            \n"
+        "    beq 3f                 \n"
         
-        "    m1_loopkd8_nd4_even:  \n"
+        "    2:  \n"
         "        ld1 {v4.8b, v5.8b, v6.8b, v7.8b}, [%1], #32    \n"
         "        ld1 {v12.8b, v13.8b, v14.8b, v15.8b}, [%1], #32\n"
         
@@ -500,18 +498,18 @@ void int8kernel_m1(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "        smlal v1.8h, v3.8b, v15.8b \n"
         "        sadalp v11.4s, v1.8h       \n"
         
-        "        subs w19, w19, #2         \n"
-        "        bne m1_loopkd8_nd4_even   \n"
+        "        subs w19, w19, #2          \n"
+        "        bne 2b                     \n"
         
-        "    m1_loopkd8_nd4_end:               \n"
+        "    3:                             \n"
         "        addp v8.4s, v8.4s, v9.4s   \n"
         "        addp v10.4s, v10.4s, v11.4s\n"
         "        addp v8.4s, v8.4s, v10.4s  \n"
         
         "        // start process kd4 kd2 kd1 cases\n"
-        "    m1_loopkd4_nd4:                   \n"
-        "        cmp %w5, #0                   \n"
-        "        beq m1_loopkd2_nd4            \n"
+        "    1:                   \n"
+        "        cmp %w5, #0                \n"
+        "        beq 4f                     \n"
         "        // start subkernel_m1n4k4  \n"
         "        ld1 {v4.8b, v5.8b}, [%1], #16  // load B4x4\n"
         "        sxtl v4.8h, v4.8b          \n"
@@ -533,9 +531,9 @@ void int8kernel_m1(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "        addp v12.4s, v12.4s, v14.4s\n"
         "        add v8.4s, v8.4s, v12.4s   \n"
         
-        "    m1_loopkd2_nd4:           \n"
-        "        cmp %w6, #0           \n"
-        "        beq m1_loopkd1_nd4    \n"
+        "    4:                        \n"
+        "        cmp %w6, #0            \n"
+        "        beq 5f                 \n"
         "        // start subkernel_m1n4k2\n"
         "        ld1 {v4.8b}, [%0]       // load A1x2   \n"
         "        add %0, %0, #2                         \n"
@@ -547,9 +545,9 @@ void int8kernel_m1(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "        smull v0.8h, v0.8b, v4.8b  \n"
         "        sadalp v8.4s, v0.8h        \n"
         
-        "    m1_loopkd1_nd4:       \n"
+        "    5:                    \n"
         "        cmp %w7, #0       \n"
-        "        beq m1_loopnd4_end\n"
+        "        beq 6f            \n"
         "        // start subkernel_m1n4k1  \n"
         "        ld1 {v4.8b}, [%1]   // load B1x4\n"
         "        add %1, %1, #4     \n"
@@ -559,9 +557,9 @@ void int8kernel_m1(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "        sxtl v2.8h, v2.8b  \n"
         "        smlal v8.4s, v4.4h, v2.h[0]\n"
         
-        "    m1_loopnd4_end:                \n"
+        "    6:                             \n"
         "        cmp %9, #0                 \n"
-        "        beq m1_loopnd4_write       \n"
+        "        beq 7f                     \n"
         "        ldr w24, [%9]              \n"
         "        // int32 => fp32           \n"
         "        scvtf v8.4s, v8.4s         \n"
@@ -569,15 +567,15 @@ void int8kernel_m1(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "        mov v12.s[0], w24          \n"
         "        fmul v8.4s, v8.4s, v12.s[0]\n"
         
-        "        cmp %10, #0\n"
-        "        beq m1_loopnd4_end_requant \n"
+        "        cmp %10, #0                \n"
+        "        beq 8f                     \n"
         
         "        // fp32 += bias_tm         \n"
         "        ldr w24, [%10]             \n"
         "        dup v15.4s, w24            \n"
         "        fadd v8.4s, v8.4s, v15.4s  \n"
         
-        "        m1_loopnd4_end_requant:\n"
+        "        8:                     \n"
         "            // fp32 -> int32   \n"
         "            fcvtas v8.4s, v8.4s\n"
         "            // int32 -> int16  \n"
@@ -588,13 +586,13 @@ void int8kernel_m1(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "            st1 {v8.s}[0], [%2]\n"
         "            add %2, %2, #4     \n"
         "            b m1_loopnd4_finish\n"
-        "    m1_loopnd4_write:          \n"
+        "    7:                         \n"
         "        st1 {v8.4s}, [%2], #16 \n"
         
         "    m1_loopnd4_finish:     \n"
         "        subs %w8, %w8, #1  \n"
         "        mov %0, x8         \n"
-        "        bne m1_loopnd4     \n"
+        "        bne 9b             \n"
         : "=r"(pa),     // %0
           "=r"(pb),     // %1
           "=r"(pc),     // %2
@@ -621,8 +619,6 @@ void int8kernel_m1(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         );
     }
 
-//    print_fp32_vec(scales, bias,  m);
-
     if (n2 > 0) {
         asm volatile(
         "m1_nd2_start:                  \n"
@@ -634,11 +630,11 @@ void int8kernel_m1(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "    mov x8, %0  // PanelA\n"
         
         "    cmp %w4, #0                  \n"
-        "    beq m1_loopkd4_nd2  // k <= 7\n"
+        "    beq 1f     // k <= 7\n"
         
         "    mov w19, %w4\n"
         "    cmp %w3, #0 \n"
-        "    beq m1_loopkd8_nd2_even  // loop number is even \n"
+        "    beq 2f     // loop number is even \n"
         
         "    // start loopmd1_kd8_nd2   \n"
         "    subs w19, w19, #1          \n"
@@ -650,9 +646,9 @@ void int8kernel_m1(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "    saddlp v9.4s, v0.8h        \n"
         
         "    cmp w19, #0        \n"
-        "    beq m1_loopkd8_nd2_end\n"
+        "    beq 3f             \n"
         
-        "    m1_loopkd8_nd2_even:  \n"
+        "    2:  \n"
         "        ld1 {v4.8b, v5.8b, v6.8b, v7.8b}, [%1], #32\n"
         
         "        ld1 {v2.8b, v3.8b}, [%0], #16  \n"
@@ -666,16 +662,16 @@ void int8kernel_m1(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "        sadalp v9.4s, v1.8h        \n"
         
         "        subs w19, w19, #2      \n"
-        "        bne m1_loopkd8_nd2_even   \n"
+        "        bne 2b                 \n"
         
-        "    m1_loopkd8_nd2_end:               \n"
+        "    3:                             \n"
         "        addp v8.4s, v8.4s, v9.4s   \n"
         "        addp v8.4s, v8.4s, v8.4s   \n"
         
         "        // start process kd4 kd2 kd1 cases \n"
-        "    m1_loopkd4_nd2:               \n"
+        "    1:               \n"
         "        cmp %w5, 0                \n"
-        "        beq m1_loopkd2_nd2        \n"
+        "        beq 4f                    \n"
         "        // start subkernel_m1n2k4          \n"
         "        ld1 {v4.8b}, [%1], #8  // load B4x2\n"
         "        sxtl v4.8h, v4.8b      \n"
@@ -692,9 +688,9 @@ void int8kernel_m1(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "        addp v9.4s, v9.4s, v9.4s   \n"
         "        add v8.4s, v8.4s, v9.4s    \n"
         
-        "    m1_loopkd2_nd2:   \n"
-        "        cmp %w6, 0 \n"
-        "        beq m1_loopkd1_nd2            \n"
+        "    4:   \n"
+        "        cmp %w6, 0                 \n"
+        "        beq 5f                     \n"
         "        // start subkernel_m1n2k2  \n"
         "        ld1 {v4.8b}, [%0]   // load A1x2\n"
         "        add %0, %0, #2 \n"
@@ -707,9 +703,9 @@ void int8kernel_m1(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "        saddlp v0.4s, v0.8h        \n"
         "        add v8.4s, v8.4s, v0.4s    \n"
         
-        "    m1_loopkd1_nd2:                \n"
+        "    5:                             \n"
         "        cmp %w7, 0                 \n"
-        "        beq m1_loopnd2_end         \n"
+        "        beq 6f                     \n"
         "        // start subkernel_m1n2k1  \n"
         "        ld1 {v4.8b}, [%1]   // load B1x2\n"
         "        add %1, %1, #2             \n"
@@ -719,9 +715,9 @@ void int8kernel_m1(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "        sxtl v2.8h, v2.8b          \n"
         "        smlal v8.4s, v4.4h, v2.h[0]\n"
         
-        "    m1_loopnd2_end:            \n"
+        "    6:                         \n"
         "        cmp %9, #0             \n"
-        "        beq m1_loopnd2_write   \n"
+        "        beq 7f                 \n"
         "        // v12: s0 s1          \n"
         "        ldr w24, [%9]          \n"
         "        mov v12.s[0], w24      \n"
@@ -733,7 +729,7 @@ void int8kernel_m1(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "        fmul v8.2s, v8.2s, v12.2s  \n"
         
         "        cmp %10, #0                \n"
-        "        beq m1_loopnd2_end_requant \n"
+        "        beq 8f                     \n"
         
         "        // fp32 += bias_tm         \n"
         "        ldr w24, [%10]             \n"
@@ -741,7 +737,7 @@ void int8kernel_m1(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "        mov v12.s[1], v12.s[0]     \n"
         "        fadd v8.2s, v8.2s, v12.2s  \n"
         
-        "        m1_loopnd2_end_requant:\n"
+        "        8:\n"
         "            // fp32 -> int32   \n"
         "            fcvtas v8.2s, v8.2s\n"
         "            // int32 -> int16  \n"
@@ -752,7 +748,7 @@ void int8kernel_m1(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "            st1 {v8.h}[0], [%2]\n"
         "            add %2, %2, #2     \n"
         "            b m1_loopnd2_finish\n"
-        "    m1_loopnd2_write:          \n"
+        "    7:          \n"
         "        st1 {v8.2s}, [%2], #8  \n"
 
         "    m1_loopnd2_finish: \n"
@@ -793,12 +789,12 @@ void int8kernel_m1(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "    eor v11.16b, v11.16b, v11.16b\n"
 
         "    cmp %w4, #0                    \n"
-        "    beq m1_loopkd4_nd1 // k <= 7   \n"
+        "    beq 1f // k <= 7   \n"
         
         "    mov w19, %w4\n"
 
         "    cmp %w3, #0 \n"
-        "    beq m1_loopkd8_nd1_even // loop number is even \n"
+        "    beq 2f // loop number is even \n"
         
         "    // start loopkd8_nd1                   \n"
         "    subs w19, w19, #1                      \n"
@@ -808,9 +804,9 @@ void int8kernel_m1(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "    saddlp v8.4s, v0.8h                    \n"
         
         "    cmp w19, #0           \n"
-        "    beq m1_loopkd8_nd1_end\n"
+        "    beq 3f                \n"
         
-        "    m1_loopkd8_nd1_even:                  \n"
+        "    2:                  \n"
         "        ld1 {v4.8b, v5.8b}, [%1], #16  \n"
         "        ld1 {v24.8b, v25.8b}, [%0], #16\n"
 
@@ -819,16 +815,16 @@ void int8kernel_m1(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "        sadalp v8.4s, v0.8h        \n"
         
         "        subs w19, w19, #2          \n"
-        "        bne m1_loopkd8_nd1_even    \n"
+        "        bne 2b                     \n"
         
-        "    m1_loopkd8_nd1_end:            \n"
+        "    3:                             \n"
         "        addp v8.4s, v8.4s, v8.4s   \n"
         "        addp v8.4s, v8.4s, v8.4s   \n"
         
         "        // start process kd4 kd2 kd1 cases\n"
-        "    m1_loopkd4_nd1:                \n"
+        "    1:                \n"
         "        cmp %w5, 0                 \n"
-        "        beq m1_loopkd2_nd1         \n"
+        "        beq 4f                     \n"
         "        // start subkernel_m1n1k4  \n"
         "        ld1 {v4.8b}, [%1]  // load B4x1\n"
         "        add %1, %1, #4             \n"
@@ -843,9 +839,9 @@ void int8kernel_m1(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "        addp v9.4s, v9.4s, v9.4s   \n"
         "        add v8.4s, v8.4s, v9.4s    \n"
         
-        "    m1_loopkd2_nd1:   \n"
+        "    4:   \n"
         "        cmp %w6, 0    \n"
-        "        beq m1_loopkd1_nd1         \n"
+        "        beq 5f                     \n"
         "        // start subkernel_m1n1k2  \n"
         "        ld1 {v4.8b}, [%0]   // load A1x2\n"
         "        add %0, %0, #2             \n"
@@ -857,9 +853,9 @@ void int8kernel_m1(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
 
         "        add v8.4s, v8.4s, v0.4s    \n"
         
-        "    m1_loopkd1_nd1:                \n"
+        "    5:                \n"
         "        cmp %w7, 0                 \n"
-        "        beq m1_loopnd1_end         \n"
+        "        beq 6f                     \n"
         "        // start subkernel_m1n1k1  \n"
         
         "        ld1 {v0.8b}, [%1]    // load B1x1  \n"
@@ -875,9 +871,9 @@ void int8kernel_m1(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
 
         "        add v8.4s, v8.4s, v0.4s    \n"
         
-        "    m1_loopnd1_end:            \n"
+        "    6:            \n"
         "        cmp %9, #0             \n"
-        "        beq m1_loopnd1_write   \n"
+        "        beq 7f             \n"
         "        // int32 => fp32   \n"
         "        scvtf v8.2s, v8.2s \n"
         "        // fp32 *= scale_tm\n"
@@ -886,14 +882,14 @@ void int8kernel_m1(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "        fmul v8.2s, v8.2s, v12.2s \n"
         
         "        cmp %10, #0                \n"
-        "        beq m1_loopnd1_end_requant \n"
+        "        beq 8f                     \n"
         
         "        // fp32 += bias_tm         \n"
         "        ldr w24, [%10]             \n"
         "        mov v12.s[0], w24          \n"
         "        fadd v8.2s, v8.2s, v12.2s  \n"
         
-        "        m1_loopnd1_end_requant:   \n"
+        "        8:                     \n"
         "            // fp32 -> int32   \n"
         "            fcvtas v8.2s, v8.2s\n"
         "            // int32 -> int16  \n"
@@ -904,7 +900,7 @@ void int8kernel_m1(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "            st1 {v8.b}[0], [%2]\n"
         "        b m1_finish            \n"
 
-        "    m1_loopnd1_write:          \n"
+        "    7:          \n"
         "        st1 {v8.s}[0], [%2]    \n"
         "    m1_finish:                 \n"
         "        mov x0, #0             \n"
@@ -936,7 +932,7 @@ void int8kernel_m1(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
     }
 }
 
-void int8kernel_m2(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int ldc, float* scales, float* bias) {
+void int8kernel_m2(void* dst, int8_t* sa, int8_t* sb, int, int k, int n, int ldc, float* scales, float* bias) {
     void *pc0, *pc1;
     if (scales == nullptr) {
         pc0 = (int32_t*)dst;
@@ -953,7 +949,7 @@ void int8kernel_m2(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
 
     if (n4 > 0) {
         asm volatile(
-        "m2_loopnd4:                        \n"
+        "9:                        \n"
         "    eor v8.16b, v8.16b, v8.16b     \n"
         "    eor v9.16b, v9.16b, v9.16b     \n"
         "    eor v10.16b, v10.16b, v10.16b  \n"
@@ -975,12 +971,12 @@ void int8kernel_m2(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "    mov x8, %0  // PanelA  \n"
         
         "    cmp %w5, #0            \n"
-        "    beq m2_loopkd4_nd4     \n"
+        "    beq 1f                 \n"
         
         "    mov w17, %w5           \n"
         
         "    cmp %w4, #0            \n"
-        "    beq m2_loopkd8_nd4_even // loop number is even \n"
+        "    beq 2f // loop number is even \n"
         
         "    // start loopm2_kd8_nd4\n"
         "    subs w17, w17, #1      \n"
@@ -1004,9 +1000,9 @@ void int8kernel_m2(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "    saddlp v15.4s, v1.8h       \n"
         
         "    cmp w17, #0                \n"
-        "    beq m2_loopkd8_nd4_end     \n"
+        "    beq 3f                     \n"
         
-        "    m2_loopkd8_nd4_even:               \n"
+        "    2:               \n"
         "        add x12, %1, #32               \n"
         "        ld1 {v4.8b, v5.8b}, [%1], #16  \n"
         "        ld1 {v2.8b, v3.8b}, [%0], #16  \n"
@@ -1050,9 +1046,9 @@ void int8kernel_m2(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         
         "        add %1, %1, #32        \n"
         "        subs w17, w17, #2      \n"
-        "        bne m2_loopkd8_nd4_even   \n"
+        "        bne 2b                 \n"
         
-        "    m2_loopkd8_nd4_end:               \n"
+        "    3:               \n"
         "        addp v8.4s, v8.4s, v9.4s   \n"
         "        addp v10.4s, v10.4s, v11.4s\n"
         "        addp v12.4s, v12.4s, v13.4s\n"
@@ -1062,9 +1058,9 @@ void int8kernel_m2(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "        addp v9.4s, v12.4s, v14.4s \n"
         
         "        // start process kd4 kd2 kd1 cases \n"
-        "    m2_loopkd4_nd4:                \n"
+        "    1:                \n"
         "        cmp %w6, #0                \n"
-        "        beq m2_loopkd2_nd4         \n"
+        "        beq 4f                     \n"
         "        // start subkernel_m2n4k4  \n"
         "        ld1 {v4.8b, v5.8b}, [%1], #16  // load B4x4\n"
         "        sxtl v4.8h, v4.8b          \n"
@@ -1096,9 +1092,9 @@ void int8kernel_m2(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "        addp v16.4s, v16.4s, v18.4s\n"
         "        add v9.4s, v9.4s, v16.4s   \n"
         
-        "    m2_loopkd2_nd4:                \n"
+        "    4:                \n"
         "        cmp %w7, #0                \n"
-        "        beq m2_loopkd1_nd4         \n"
+        "        beq 5f                     \n"
         "        // start subkernel_m2n4k2  \n"
         "        ld1 {v4.8b}, [%0]       // load A2x2   \n"
         "        add %0, %0, #4             \n"
@@ -1131,9 +1127,9 @@ void int8kernel_m2(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "        add v8.4s, v8.4s, v16.4s   \n"
         "        add v9.4s, v9.4s, v17.4s   \n"
         
-        "    m2_loopkd1_nd4:            \n"
+        "    5:            \n"
         "        cmp %w8, #0            \n"
-        "        beq m2_loopnd4_end     \n"
+        "        beq 6f                 \n"
         "        // start subkernel_m2n4k1  \n"
         "        ld1 {v4.8b}, [%1]   // load B1x4\n"
         "        add %1, %1, #4         \n"
@@ -1144,9 +1140,9 @@ void int8kernel_m2(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "        smlal v8.4s, v4.4h, v2.h[0]\n"
         "        smlal v9.4s, v4.4h, v2.h[1]\n"
         
-        "    m2_loopnd4_end:           \n"
+        "    6:                        \n"
         "        cmp %10, #0           \n"
-        "        beq m2_loopnd4_write  \n"
+        "        beq 7f                 \n"
 
         "        ld1 {v12.2s}, [%10]        \n"
         "        // int32 => fp32           \n"
@@ -1157,7 +1153,7 @@ void int8kernel_m2(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "        fmul v9.4s, v9.4s, v12.s[1]\n"
         
         "        cmp %11, #0                \n"
-        "        beq m2_loopnd4_end_requant \n"
+        "        beq 8f                     \n"
         
         "        // fp32 += scales_tm       \n"
         "        ld1 {v14.2s}, [%11]        \n"
@@ -1166,7 +1162,7 @@ void int8kernel_m2(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "        dup v15.4s, v14.s[1]       \n"
         "        fadd v9.4s, v9.4s, v15.4s  \n"
         
-        "        m2_loopnd4_end_requant:    \n"
+        "        8:                     \n"
         "            // fp32 -> int32   \n"
         "            fcvtas v8.4s, v8.4s\n"
         "            fcvtas v9.4s, v9.4s\n"
@@ -1181,14 +1177,14 @@ void int8kernel_m2(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "            st1 {v8.s}[1], [%3]    \n"
         "            add %3, %3, #4         \n"
         "            b m2_loopnd4_finish    \n"
-        "    m2_loopnd4_write:              \n"
+        "    7:              \n"
         "        st1 {v8.4s}, [%2], #16     \n"
         "        st1 {v9.4s}, [%3], #16     \n"
         
         "    m2_loopnd4_finish:       \n"
         "        subs %w9, %w9, #1    \n"
         "        mov %0, x8           \n"
-        "        bne m2_loopnd4       \n"
+        "        bne 9b               \n"
         : "=r"(pa),     // %0
           "=r"(pb),     // %1
           "=r"(pc0),    // %2
@@ -1241,11 +1237,11 @@ void int8kernel_m2(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "    mov x8, %0  // PanelA      \n"
         
         "    cmp %w5, #0                \n"
-        "    beq m2_loopkd4_nd2         \n"
+        "    beq 1f                     \n"
         
         "    mov w17, %w5    \n"
         "    cmp %w4, #0     \n"
-        "    beq m2_loopkd8_nd2_even  // loop number is even \n"
+        "    beq 2f         // loop number is even \n"
         
         "    // start loopmd2_kd8_nd2   \n"
         "    subs w17, w17, #1          \n"
@@ -1261,9 +1257,9 @@ void int8kernel_m2(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "    saddlp v13.4s, v1.8h       \n"
         
         "    cmp w17, #0        \n"
-        "    beq m2_loopkd8_nd2_end\n"
+        "    beq 3f             \n"
         
-        "    m2_loopkd8_nd2_even:  \n"
+        "    2:  \n"
         "        ld1 {v4.8b, v5.8b}, [%1], #16  \n"
         "        ld1 {v2.8b, v3.8b}, [%0], #16  \n"
         
@@ -1285,11 +1281,11 @@ void int8kernel_m2(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         
         "        sadalp v12.4s, v0.8h       \n"
         "        sadalp v13.4s, v1.8h       \n"
-        
+
         "        subs w17, w17, #2          \n"
-        "        bne m2_loopkd8_nd2_even    \n"
+        "        bne 2b                     \n"
         
-        "    m2_loopkd8_nd2_end:            \n"
+        "    3:            \n"
         "        addp v8.4s, v8.4s, v9.4s   \n"
         "        addp v12.4s, v12.4s, v13.4s\n"
         
@@ -1297,9 +1293,9 @@ void int8kernel_m2(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "        addp v12.4s, v12.4s, v12.4s\n"
         
         "        // start process kd4 kd2 kd1 cases\n"
-        "    m2_loopkd4_nd2:                \n"
+        "    1:                \n"
         "        cmp %w6, #0                \n"
-        "        beq m2_loopkd2_nd2         \n"
+        "        beq 4f                     \n"
         "        // start subkernel_m2n2k4  \n"
         "        ld1 {v4.8b}, [%1], #8  // load B4x2\n"
         "        sxtl v4.8h, v4.8b          \n"
@@ -1323,9 +1319,9 @@ void int8kernel_m2(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "        addp v13.4s, v13.4s, v13.4s\n"
         "        add v12.4s, v12.4s, v13.4s \n"
         
-        "    m2_loopkd2_nd2:                \n"
+        "    4:                             \n"
         "        cmp %w7, 0                 \n"
-        "        beq m2_loopkd1_nd2         \n"
+        "        beq 5f                     \n"
         "        // start subkernel_m2n2k2  \n"
         "        ld1 {v4.8b}, [%0]   // load A2x2\n"
         "        add %0, %0, #4             \n"
@@ -1348,9 +1344,9 @@ void int8kernel_m2(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "        mov v13.s[1], v21.s[1]     \n"
         "        add v12.4s, v12.4s, v13.4s \n"
         
-        "    m2_loopkd1_nd2:                \n"
+        "    5:                \n"
         "        cmp %w8, #0                \n"
-        "        beq m2_loopnd2_end         \n"
+        "        beq 6f                     \n"
         "        // start subkernel_m2n2k1  \n"
         "        ld1 {v4.8b}, [%1]   // load B1x2\n"
         "        add %1, %1, #2             \n"
@@ -1361,9 +1357,9 @@ void int8kernel_m2(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "        smlal v8.4s, v4.4h, v2.h[0]\n"
         "        smlal v12.4s, v4.4h, v2.h[1]   \n"
         
-        "    m2_loopnd2_end:               \n"
+        "    6:               \n"
         "        cmp %9, #0                \n"
-        "        beq m2_loopnd2_write      \n"
+        "        beq 7f                     \n"
 
         "        mov v8.d[1], v12.d[0]     \n"
         
@@ -1378,14 +1374,14 @@ void int8kernel_m2(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "        fmul v8.4s, v8.4s, v12.4s  \n"
         
         "        cmp %10, #0                \n"
-        "        beq m2_loopnd2_end_requant \n"
+        "        beq 8f                     \n"
         
         "        // fp32 += bias_tm         \n"
         "        ld1 {v12.2s}, [%10]        \n"
         "        zip1 v12.4s, v12.4s, v12.4s\n"
         "        fadd v8.4s, v8.4s, v12.4s  \n"
         
-        "        m2_loopnd2_end_requant:    \n"
+        "        8:    \n"
         "            // fp32 -> int32       \n"
         "            fcvtas v8.4s, v8.4s    \n"
         "            // int32 -> int16      \n"
@@ -1399,7 +1395,7 @@ void int8kernel_m2(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "            add %3, %3, #2       \n"
         "            b m2_loopnd2_finish    \n"
 
-        "    m2_loopnd2_write:"
+        "    7:"
         "        st1 {v8.2s}, [%2], #8      \n"
         "        st1 {v12.2s}, [%3], #8     \n"
         "    m2_loopnd2_finish:             \n"
@@ -1452,12 +1448,12 @@ void int8kernel_m2(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
 
         "m2_nd1_start:                  \n"
         "    cmp %w5, #0                \n"
-        "    beq m2_loopkd4_nd1 // k <=7\n"
+        "    beq 1f             // k <=7\n"
         
         "    mov w17, %w5\n"
 
         "    cmp %w4, #0 \n"
-        "    beq m2_loopkd8_nd1_even // loop number is even \n"
+        "    beq 2f     // loop number is even \n"
         
         "    // start loopkd8_nd1   \n"
         "    subs w17, w17, #1      \n"
@@ -1469,9 +1465,9 @@ void int8kernel_m2(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "    saddlp v12.4s, v1.8h       \n"
         
         "    cmp w17, #0           \n"
-        "    beq m2_loopkd8_nd1_end\n"
+        "    beq 3f                \n"
         
-        "    m2_loopkd8_nd1_even:  \n"
+        "    2:  \n"
         "        ld1 {v4.8b, v5.8b}, [%1], #16                  \n"
         "        ld1 {v24.8b, v25.8b, v26.8b, v27.8b}, [%0], #32\n"
 
@@ -1484,18 +1480,18 @@ void int8kernel_m2(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "        sadalp v12.4s, v1.8h       \n"
 
         "        subs w17, w17, #2          \n"
-        "        bne m2_loopkd8_nd1_even    \n"
+        "        bne 2b                     \n"
         
-        "    m2_loopkd8_nd1_end:            \n"
+        "    3:            \n"
         "        addp v8.4s, v8.4s, v8.4s   \n"
         "        addp v8.4s, v8.4s, v8.4s   \n"
         "        addp v12.4s, v12.4s, v12.4s\n"
         "        addp v12.4s, v12.4s, v12.4s\n"
         
         "        // start process kd4 kd2 kd1 cases\n"
-        "    m2_loopkd4_nd1:                       \n"
+        "    1:                       \n"
         "        cmp %w6, #0                       \n"
-        "        beq m2_loopkd2_nd1                \n"
+        "        beq 4f                         \n"
         "        // start subkernel_m2n1k2      \n"
         "        ld1 {v4.8b}, [%1]  // load B4x1\n"
         "        add %1, %1, #4                 \n"
@@ -1515,9 +1511,9 @@ void int8kernel_m2(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "        addp v13.4s, v13.4s, v13.4s\n"
         "        add v12.4s, v12.4s, v13.4s \n"
         
-        "    m2_loopkd2_nd1:                \n"
+        "    4:                             \n"
         "        cmp %w7, 0                 \n"
-        "        beq m2_loopkd1_nd1         \n"
+        "        beq 5f                     \n"
         "        // start subkernel_m2n1k2  \n"
         "        ld1 {v4.8b}, [%0]   // load A2x2\n"
         "        add %0, %0, #4             \n"
@@ -1534,9 +1530,9 @@ void int8kernel_m2(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "        mov v13.s[0], v0.s[1]      \n"
         "        add v12.4s, v12.4s, v13.4s \n"
         
-        "    m2_loopkd1_nd1:                \n"
+        "    5:                             \n"
         "        cmp %w8, 0                 \n"
-        "        beq m2_loopnd1_end         \n"
+        "        beq 6f                     \n"
         "        // start subkernel_m2n1k1  \n"
         
         "        ld1 {v0.8b}, [%1]    // load B1x1\n"
@@ -1554,9 +1550,9 @@ void int8kernel_m2(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "        add v8.4s, v8.4s, v0.4s    \n"
         "        add v12.4s, v12.4s, v1.4s  \n"
         
-        "    m2_loopnd1_end:                \n"
+        "    6:                             \n"
         "        cmp %w9, #0                \n"
-        "        beq m2_loopnd1_write       \n"
+        "        beq 7f                     \n"
         "        mov v8.s[1], v12.s[0]      \n"
         
         "        // v12: s0 s1              \n"
@@ -1566,14 +1562,14 @@ void int8kernel_m2(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "        // fp32 *= scale_tm        \n"
         "        fmul v8.2s, v8.2s, v12.2s  \n"
         
-        "        cmp %10, #0 \n"
-        "        beq m2_loopnd1_end_requant \n"
+        "        cmp %10, #0                \n"
+        "        beq 8f                     \n"
         
         "        // fp32 += bias_tm         \n"
         "        ld1 {v12.2s}, [%10]        \n"
         "        fadd v8.2s, v8.2s, v12.2s  \n"
         
-        "        m2_loopnd1_end_requant:       \n"
+        "        8:                         \n"
         "            // fp32 -> int32       \n"
         "            fcvtas v8.2s, v8.2s    \n"
         "            // int32 -> int16      \n"
@@ -1585,7 +1581,7 @@ void int8kernel_m2(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "            st1 {v8.b}[1], [%3]    \n"
         "            b m2_finish            \n"
 
-        "    m2_loopnd1_write:          \n"
+        "    7:                         \n"
         "        st1 {v8.s}[0], [%2]    \n"
         "        st1 {v12.s}[0], [%3]   \n"
         "    m2_finish:                 \n"
@@ -1619,7 +1615,7 @@ void int8kernel_m2(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
 
 }
 
-void int8kernel_m4(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int ldc, float* scales, float* bias) {
+void int8kernel_m4(void* dst, int8_t* sa, int8_t* sb, int, int k, int n, int ldc, float* scales, float* bias) {
     void *pc0, *pc1, *pc2, *pc3;
     if (scales == nullptr) {
         pc0 = (int32_t*)dst;
@@ -1641,7 +1637,7 @@ void int8kernel_m4(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
     if (n4 > 0) {
         fprintf(stdout, "start m4n4 \n");
         asm volatile(
-        "m4_loopnd4:                   \n"
+        "8:                             \n"
         "   eor v8.8b, v8.8b, v8.8b    \n"
         "   eor v9.8b, v9.8b, v9.8b    \n"
         "   eor v10.8b, v10.8b, v10.8b \n"
@@ -1662,11 +1658,11 @@ void int8kernel_m4(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
 
         "   mov x8, %0          \n"
         "   cmp %w7, #0         \n"
-        "   beq m4_loopkd4_nd4  \n"
+        "   beq 1f              \n"
         "   mov w20, %w7        \n"
 
         "   cmp %w6, #0         \n"
-        "   beq m4_loopkd8_nd4_even\n"
+        "   beq 2f              \n"
         
         "   subs w20, w20, #1   \n"
         "   ld1 {v4.8b, v5.8b, v6.8b, v7.8b}, [%1], #32 \n"
@@ -1707,9 +1703,9 @@ void int8kernel_m4(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "   saddlp v23.4s, v1.8h        \n"
        
         "   cmp w20, #0                 \n"
-        "   beq m4_loopkd8_nd4_end      \n"
+        "   beq 3f                      \n"
        
-        "   m4_loopkd8_nd4_even:       \n"
+        "   2:                       \n"
         "       add x15, %x1, #32    \n"
         "       add x14, %x0, #32    \n"
         "       ld1 {v4.8b, v5.8b}, [%1], #16\n"
@@ -1785,9 +1781,9 @@ void int8kernel_m4(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "       add %0, %0, #32     \n"
         "       add %1, %1, #32     \n"
         "       subs w20, w20, #2   \n"
-        "       bne m4_loopkd8_nd4_even\n"
+        "       bne 2b              \n"
         // start nd2
-        "    m4_loopkd8_nd4_end:               \n"
+        "    3:                     \n"
         "        addp v8.4s, v8.4s, v9.4s   \n"
         "        addp v10.4s, v10.4s, v11.4s\n"
         "        addp v12.4s, v12.4s, v13.4s\n"
@@ -1803,9 +1799,9 @@ void int8kernel_m4(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "        addp v11.4s, v20.4s, v22.4s\n"
 
         "        // start process kd4 kd2 kd1 cases\n"
-        "    m4_loopkd4_nd4:       \n"
-        "        cmp %w8, #0     \n"
-        "        beq m4_loopkd2_nd4\n"
+        "    1:                     \n"
+        "        cmp %w8, #0        \n"
+        "        beq 4f             \n"
         "        // start subkernel_m4n4k4\n"
         "        ld1 {v4.8b, v5.8b}, [%1], #16  // load B4x4\n"
         "        sxtl v4.8h, v4.8b      \n"
@@ -1861,9 +1857,9 @@ void int8kernel_m4(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "        addp v16.4s, v16.4s, v18.4s\n"
         "        add v11.4s, v11.4s, v16.4s \n"
         
-        "    m4_loopkd2_nd4:                \n"
+        "    4:                             \n"
         "        cmp %w9, #0                \n"
-        "        beq m4_loopkd1_nd4         \n"
+        "        beq 5f                     \n"
         "        // start subkernel_m4n4k2  \n"
         "        ld1 {v0.8b}, [%1], #8   // load B2x4   \n"
         "                            // 00 11 22 33     \n"
@@ -1906,9 +1902,9 @@ void int8kernel_m4(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "        add v10.4s, v10.4s, v18.4s \n"
         "        add v11.4s, v11.4s, v19.4s \n"
         
-        "    m4_loopkd1_nd4:            \n"
+        "    5:                         \n"
         "        cmp %w10, #0           \n"
-        "        beq m4_loopnd4_end     \n"
+        "        beq 6f                   \n"
         "        // start subkernel_m4n4k1\n"
         "        ld1 {v4.8b}, [%1]   // load B1x4\n"
         "        add %1, %1, #4     \n"
@@ -1921,10 +1917,9 @@ void int8kernel_m4(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "        smlal v10.4s, v4.4h, v2.h[2]   \n"
         "        smlal v11.4s, v4.4h, v2.h[3]   \n"
         
-        "    m4_loopnd4_end:                       \n"
-        "        // we should use a better quantization scheme\n"
+        "    6:                            \n"
         "        cmp %12, #0               \n"
-        "        beq m4_loopnd4_write      \n"
+        "        beq 9f                    \n"
 
         "        ld1 {v12.4s}, [%12] \n"
         "        // int32 => fp32       \n"
@@ -1939,7 +1934,7 @@ void int8kernel_m4(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "        fmul v11.4s, v11.4s, v12.s[3]  \n"
         
         "        cmp %13, #0            \n"
-        "        beq m4_loopnd4_end_requant\n"
+        "        beq 7f                 \n"
         
         "        ld1 {v14.4s}, [%13]    \n"
         "        dup v15.4s, v14.s[0]   \n"
@@ -1951,7 +1946,7 @@ void int8kernel_m4(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "        dup v15.4s, v14.s[3]       \n"
         "        fadd v11.4s, v11.4s, v15.4s\n"
         
-        "        m4_loopnd4_end_requant:    \n"
+        "        7:                         \n"
         "            // fp32 -> int32       \n"
         "            fcvtas v8.4s, v8.4s    \n"
         "            fcvtas v9.4s, v9.4s    \n"
@@ -1976,7 +1971,7 @@ void int8kernel_m4(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "            add %x5, %x5, #4       \n"
         "            b m4_loopnd4_finish    \n"
 
-        "    m4_loopnd4_write:              \n"
+        "    9:                             \n"
         "        st1 {v8.4s}, [%x2], #16    \n"
         "        st1 {v9.4s}, [%x3], #16    \n"
         "        st1 {v10.4s}, [%x4], #16   \n"
@@ -1985,7 +1980,7 @@ void int8kernel_m4(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "    m4_loopnd4_finish:          \n"
         "        subs %x11, %x11, #1     \n"
         "        mov %x0, x8             \n"
-        "        bne m4_loopnd4          \n"
+        "        bne 8b                  \n"
         : "=r"(pa),     // %0
           "=r"(pb),     // %1
           "=r"(pc0),    // %2
@@ -2043,11 +2038,11 @@ void int8kernel_m4(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "    mov x8, %x0  // PanelA     \n"
         
         "    cmp %w7, #0                 \n"
-        "    beq m4_loopkd4_nd2  // k <= 7     \n"
+        "    beq 1f         // k <= 7     \n"
         
         "    mov w20, %w7                \n"
         "    cmp %w6, #0                 \n"
-        "    beq m4_loopkd8_nd2_even  // loop number is even \n"
+        "    beq 2f// loop number is even \n"
         
         "    // start loopkd8_nd2       \n"
         "    subs w20, w20, #1          \n"
@@ -2072,10 +2067,10 @@ void int8kernel_m4(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "    saddlp v17.4s, v0.8h       \n"
         "    saddlp v21.4s, v1.8h       \n"
         
-        "    cmp w20, #0                 \n"
-        "    beq m4_loopkd8_nd2_end        \n"
+        "    cmp w20, #0                \n"
+        "    beq 3f                     \n"
         
-        "    m4_loopkd8_nd2_even: \n"
+        "    2: \n"
         "        add x15, %1, #16 \n"
         "        add x14, %0, #32 \n"
         "        ld1 {v4.8b, v5.8b}, [%1], #16  \n"
@@ -2120,9 +2115,9 @@ void int8kernel_m4(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "        add %0, %0, #32        \n"
         "        add %1, %1, #16        \n"
         "        subs w20, w20, #2      \n"
-        "        bne m4_loopkd8_nd2_even\n"
+        "        bne 2b                 \n"
         
-        "    m4_loopkd8_nd2_end:            \n"
+        "    3:                             \n"
         "        addp v8.4s, v8.4s, v9.4s   \n"
         "        addp v12.4s, v12.4s, v13.4s\n"
         "        addp v16.4s, v16.4s, v17.4s\n"
@@ -2134,9 +2129,9 @@ void int8kernel_m4(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "        addp v20.4s, v20.4s, v20.4s\n"
         
         "        // start process kd4 kd2 kd1 cases\n"
-        "    m4_loopkd4_nd2:   \n"
+        "    1:   \n"
         "        cmp %w8, 0 \n"
-        "        beq m4_loopkd2_nd2 \n"
+        "        beq 4f     \n"
         "        // start subkernel_m4n2k4  \n"
         "        ld1 {v4.8b}, [%1], #8  // load B4x2\n"
         "        sxtl v4.8h, v4.8b      \n"
@@ -2178,9 +2173,9 @@ void int8kernel_m4(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "        addp v21.4s, v21.4s, v21.4s\n"
         "        add v20.4s, v20.4s, v21.4s \n"
         
-        "    m4_loopkd2_nd2:                \n"
-        "        cmp %w9, 0                  \n"
-        "        beq m4_loopkd1_nd2         \n"
+        "    4:                             \n"
+        "        cmp %w9, 0                 \n"
+        "        beq 5f                     \n"
         "        // start subkernel_m4n2k2  \n"
         "        ld1 {v4.8b}, [%0], #8   //load A4x2\n"
         "        ld1 {v0.8b}, [%1]   // load B2x2   \n"
@@ -2216,9 +2211,9 @@ void int8kernel_m4(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "        mov v21.s[1], v23.s[3]     \n"
         "        add v20.4s, v20.4s, v21.4s \n"
         
-        "    m4_loopkd1_nd2:   \n"
+        "    5:   \n"
         "        cmp %w10, 0    \n"
-        "        beq m4_loopnd2_end    \n"
+        "        beq 6f         \n"
         "        // start subkernel_m4n2k1\n"
         "        ld1 {v4.8b}, [%1]   // load B1x2\n"
         "        add %1, %1, #2     \n"
@@ -2231,9 +2226,9 @@ void int8kernel_m4(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "        smlal v16.4s, v4.4h, v2.h[2]   \n"
         "        smlal v20.4s, v4.4h, v2.h[3]   \n"
         
-        "    m4_loopnd2_end:               \n"
-        "        cmp %11, #0               \n"
-        "        beq m4_loopnd2_write      \n"
+        "    6:               \n"
+        "        cmp %11, #0            \n"
+        "        beq 7f                 \n"
 
         "        mov v8.d[1], v12.d[0]  \n"
         "        mov v16.d[1], v20.d[0] \n"
@@ -2253,16 +2248,16 @@ void int8kernel_m4(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "        fmul v16.4s, v16.4s, v13.4s\n"
         
         "        cmp %12, #0   \n"
-        "        beq m4_loopnd2_end_requant   // skip add scales\n"
+        "        beq 8f // skip add scales  \n"
         
         "        // fp32 += scales_tm       \n"
-        "        ld1 {v12.4s}, [%12]         \n"
+        "        ld1 {v12.4s}, [%12]        \n"
         "        zip2 v13.4s, v12.4s, v12.4s\n"
         "        zip1 v12.4s, v12.4s, v12.4s\n"
         "        fadd v8.4s, v8.4s, v12.4s  \n"
         "        fadd v16.4s, v16.4s, v13.4s\n"
         
-        "        m4_loopnd2_end_requant:       \n"
+        "        8:                         \n"
         "            // fp32 -> int32       \n"
         "            fcvtas v8.4s, v8.4s    \n"
         "            fcvtas v16.4s, v16.4s  \n"
@@ -2274,7 +2269,7 @@ void int8kernel_m4(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "            sqxtn v16.8b, v16.8h   \n"
         "            // save                \n"
         "            st1 {v8.h}[0], [%2]    \n"
-        "            add %2, %2, #2       \n"
+        "            add %2, %2, #2         \n"
         "            st1 {v8.h}[1], [%3]    \n"
         "            add %3, %3, #2       \n"
         "            st1 {v16.h}[0], [%4]   \n"
@@ -2283,7 +2278,7 @@ void int8kernel_m4(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "            add %5, %5, #2       \n"
         "            b m4_loopnd2_finish    \n"
 
-        "    m4_loopnd2_write:             \n"
+        "    7:             \n"
         "        st1 {v8.2s}, [%2], #8     \n"
         "        st1 {v12.2s}, [%3], #8    \n"
         "        st1 {v16.2s}, [%4], #8    \n"
@@ -2344,11 +2339,11 @@ void int8kernel_m4(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
 
         "m4_n1_start:                       \n"
         "    cmp %w7, #0                     \n"
-        "    beq m4_loopkd4_nd1 // k <= 7   \n"
+        "    beq 10f             \n"
         
         "    mov w20, %w7        \n"
         "    cmp %w6, #0         \n"
-        "    beq m4_loopkd8_nd1_even // loop number is even \n"
+        "    beq 11f// loop number is even \n"
         
         "    // start loopkd8_nd1       \n"
         "    subs w20, w20, #1          \n"
@@ -2366,9 +2361,9 @@ void int8kernel_m4(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "    saddlp v20.4s, v1.8h       \n"
         
         "    cmp w20, #0                \n"
-        "    beq m4_loopkd8_nd1_end     \n"
+        "    beq 12f                    \n"
         
-        "    m4_loopkd8_nd1_even:          \n"
+        "    11:          \n"
         "        ld1 {v4.8b, v5.8b}, [%1], #16  \n"
         "        ld1 {v24.8b, v25.8b, v26.8b, v27.8b}, [%0], #32\n"
         "        ld1 {v28.8b, v29.8b, v30.8b, v31.8b}, [%0], #32\n"
@@ -2389,10 +2384,10 @@ void int8kernel_m4(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "        smlal v1.8h, v31.8b, v5.8b \n"
         "        sadalp v20.4s, v1.8h       \n"
         
-        "        subs w20, w20, #2            \n"
-        "        bne m4_loopkd8_nd1_even       \n"
+        "        subs w20, w20, #2          \n"
+        "        bne 11b                    \n"
         
-        "    m4_loopkd8_nd1_end:               \n"
+        "    12:                            \n"
         "        addp v8.4s, v8.4s, v8.4s   \n"
         "        addp v8.4s, v8.4s, v8.4s   \n"
         "        addp v12.4s, v12.4s, v12.4s\n"
@@ -2403,9 +2398,9 @@ void int8kernel_m4(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "        addp v20.4s, v20.4s, v20.4s\n"
         
         "        // start process kd4 kd2 kd1 cases\n"
-        "    m4_loopkd4_nd1:           \n"
+        "    10:                        \n"
         "        cmp %w8, #0            \n"
-        "        beq m4_loopkd2_nd1    \n"
+        "        beq 13f                        \n"
         "        // start subkernel_m4n1k2      \n"
         "        ld1 {v4.8b}, [%1]  // load B4x1\n"
         "        add %x1, %x1, #4       \n"
@@ -2437,9 +2432,9 @@ void int8kernel_m4(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "        addp v21.4s, v21.4s, v21.4s\n"
         "        add v20.4s, v20.4s, v21.4s \n"
         
-        "    m4_loopkd2_nd1:                \n"
+        "    13:                            \n"
         "        cmp %w9, #0                \n"
-        "        beq m4_loopkd1_nd1         \n"
+        "        beq 14f                    \n"
         "        // start subkernel_m4n1k2  \n"
         "        ld1 {v4.8b}, [%0], #8   // load A4x2   \n"
         "        ld1 {v0.8b}, [%1]   // load B2x1   \n"
@@ -2460,9 +2455,9 @@ void int8kernel_m4(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "        mov v21.s[0], v0.s[3]      \n"
         "        add v20.4s, v20.4s, v21.4s \n"
         
-        "    m4_loopkd1_nd1:                \n"
+        "    14:                            \n"
         "        cmp %w10, #0               \n"
-        "        beq m4_loopnd1_end         \n"
+        "        beq 15f                    \n"
         "        // start subkernel_m4n1k1  \n"
         "        ld1 {v4.8b}, [%1]   // load B1x1\n"
 
@@ -2485,10 +2480,10 @@ void int8kernel_m4(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "        mov v21.s[0], v0.s[3]      \n"
         "        add v20.4s, v20.4s, v21.4s \n"
         
-        "    m4_loopnd1_end:               \n"
+        "    15:                           \n"
         // REQUANT
-        "        cmp %11, #0               \n"
-        "        beq m4_loopnd1_write      \n"
+        "        cmp %11, #0            \n"
+        "        beq 16f                \n"
 
         "        mov v8.s[1], v12.s[0]  \n"
         "        mov v8.s[2], v16.s[0]  \n"
@@ -2502,13 +2497,13 @@ void int8kernel_m4(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "        fmul v8.4s, v8.4s, v12.4s  \n"
         
         "        cmp %12, #0                \n"
-        "        beq m4_loopnd1_end_requant \n"
+        "        beq 17f                    \n"
         
-        "        // fp32 += bias_tm           \n"
+        "        // fp32 += bias_tm         \n"
         "        ld1 {v12.4s}, [%12]        \n"
         "        fadd v8.4s, v8.4s, v12.4s  \n"
         
-        "        m4_loopnd1_end_requant:    \n"
+        "        17:                        \n"
         "            // fp32 -> int32       \n"
         "            fcvtas v8.4s, v8.4s    \n"
         "            // int32 -> int16      \n"
@@ -2523,7 +2518,7 @@ void int8kernel_m4(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
         "            b m4_finish            \n"
 
         "        // no need to add the last output pointer\n"
-        "    m4_loopnd1_write:              \n"
+        "    16:                           \n"
         "        st1 {v8.s}[0], [%2]       \n"
         "        st1 {v12.s}[0], [%3]      \n"
         "        st1 {v16.s}[0], [%4]      \n"
@@ -2564,9 +2559,9 @@ void int8kernel_m4(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int l
 #undef DECOMPOSE_K
 #undef DECOMPOSE_N
 
-void int8kernel(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int ldc, float* scales, float* bias) {
-    int8_t* pa = sa;
-    int8_t* pb = sb;
+void int8kernel(void* dst, const int8_t* sa, const int8_t* sb, int m, int k, int n, int ldc, float* scales, float* bias) {
+    int8_t* pa = (int8_t*)sa;
+    int8_t* pb = (int8_t*)sb;
     const int nn = (m >> 2) << 2;
     if (scales == nullptr) {
         int32_t* pc = (int32_t*)dst;
@@ -2599,8 +2594,9 @@ void int8kernel(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int ldc,
     } else {
         int8_t* pc = (int8_t*)dst;
 
+        #pragma omp parallel for num_threads(opt.num_threads)
         for (int i = 0; i < nn; i += 4) {
-            int8kernel_m4_new((void*)(pc + i * n), pa + i * k, pb, m, k, n, ldc, scales + i, (bias==nullptr)? nullptr: bias+i);
+            int8kernel_m4((void*)(pc + i * n), pa + i * k, pb, m, k, n, ldc, scales + i, (bias==nullptr)? nullptr: bias+i);
         }
 
         pa += nn * k;
@@ -2633,5 +2629,4 @@ void int8kernel(void* dst, int8_t* sa, int8_t* sb, int m, int k, int n, int ldc,
     return;
 }
 
-#endif
 #endif
