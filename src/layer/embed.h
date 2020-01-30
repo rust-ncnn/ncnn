@@ -35,6 +35,7 @@ public:
     int num_output;
     int input_dim;
     int bias_term;
+    int axis;
 
     int weight_data_size;
 

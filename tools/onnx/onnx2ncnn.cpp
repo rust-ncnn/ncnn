@@ -95,6 +95,28 @@ static std::vector<float> get_node_attr_af(const onnx::NodeProto& node, const ch
     return v;
 }
 
+static std::vector<std::string> get_node_attr_as(const onnx::NodeProto& node, const char* key)
+{
+    std::vector<std::string> v;
+
+    for (int i=0; i<node.attribute_size(); i++)
+    {
+        const onnx::AttributeProto& attr = node.attribute(i);
+        if (attr.name() == key)
+        {
+            v.resize(attr.strings_size());
+            for (int j=0; j<attr.strings_size(); j++)
+            {
+                v[j] = attr.strings(j);
+            }
+
+            break;
+        }
+    }
+
+    return v;
+}
+
 static int get_node_attr_i(const onnx::NodeProto& node, const char* key, int def = 0)
 {
     for (int i=0; i<node.attribute_size(); i++)
@@ -924,6 +946,11 @@ static void fuse_flatten(onnx::GraphProto* mutable_graph, std::map<std::string, 
 
 int main(int argc, char** argv)
 {
+    if (argc < 2)
+    {
+        fprintf(stderr, "Usage: onnx2ncnn export.onnx");
+        return -1;
+    }
     const char* onnxpb = argv[1];
     const char* ncnn_prototxt = argc >= 4 ? argv[2] : "ncnn.param";
     const char* ncnn_modelbin = argc >= 4 ? argv[3] : "ncnn.bin";
@@ -1378,6 +1405,10 @@ int main(int argc, char** argv)
         {
             fprintf(pp, "%-16s", "UnaryOp");
         }
+        else if (op == "Gather")
+        {
+            fprintf(pp, "%-16s", "Embed");
+        }
         else if (op == "Gemm")
         {
             float alpha = get_node_attr_f(node, "alpha", 1.f);
@@ -1431,6 +1462,10 @@ int main(int argc, char** argv)
         else if (op == "LRN")
         {
             fprintf(pp, "%-16s", "LRN");
+        }
+        else if (op == "LSTM")
+        {
+            fprintf(pp, "%-16s", "LSTM");
         }
         else if (op == "MatMul")
         {
@@ -1997,6 +2032,27 @@ int main(int argc, char** argv)
             int op_type = 2;
             fprintf(pp, " 0=%d", op_type);
         }
+        else if (op == "Gather")
+        {
+            const onnx::TensorProto& W = weights[node.input(0)];
+            fwrite_tensor_proto_data(W, bp);
+
+            const int32_t input_dim = W.dims(0);
+            const int32_t num_output = W.dims(1);
+
+            fprintf(pp, " 0=%d", num_output);
+            fprintf(pp, " 1=%d", input_dim);
+            fprintf(pp, " 2=0");
+            fprintf(pp, " 3=%d", get_tensor_proto_data_size(W));
+
+            const int axis = get_node_attr_i(node, "axis", 0);
+            if (axis != 0)
+            {
+                fprintf(stderr, "Unsupported Gather axis %d!\n", axis);
+            }
+            fprintf(pp, " 4=%d", axis);
+
+        }
         else if (op == "Gemm")
         {
             float alpha = get_node_attr_f(node, "alpha", 1.f);
@@ -2109,6 +2165,55 @@ int main(int argc, char** argv)
             fprintf(pp, " 2=%e", alpha);
             fprintf(pp, " 3=%e", beta);
             fprintf(pp, " 4=%e", bias);
+        }
+        else if (op == "LSTM")
+        {
+            const onnx::TensorProto& W = weights[node.input(1)];
+            const onnx::TensorProto& R = weights[node.input(2)];
+            
+            std::vector<float> activation_alpha = get_node_attr_af(node, "activation_alpha");
+            std::vector<float> activation_beta = get_node_attr_af(node, "activation_beta");
+            std::vector<std::string> activations = get_node_attr_as(node, "activations");
+            float clip = get_node_attr_f(node, "clip", -1.f);
+            std::string direction = get_node_attr_s(node, "direction");
+            int hidden_size = get_node_attr_i(node, "hidden_size", -1);
+            int input_forget = get_node_attr_i(node, "input_forget");
+
+            if (input_forget != 0)
+            {
+                fprintf(stderr, "Unsupported LSTM input_forget=%d, please check\n", input_forget);
+            }
+            if (!direction.empty() && direction != "forward")
+            {
+                fprintf(stderr, "Unsupported LSTM direction=%s, try forward LSTM or commit PR for ncnn\n", direction.c_str());
+            }
+            if (clip > 0.f)
+            {
+                fprintf(stderr, "Unsupported LSTM clip=%f, use normal LSTM\n", clip);
+            }
+            for (std::string& act : activations)
+            {
+                if (act != "Tanh" || act != "Sigmoid")
+                {
+                    fprintf(stderr, "Unsupported LSTM activation=%s, use normal LSTM\n", op.c_str());
+                }
+            }
+
+            fwrite_tensor_proto_data(W, bp);
+            fwrite_tensor_proto_data(R, bp);
+
+            fprintf(pp, " 0=%d", hidden_size);
+            if (node.input_size() >= 4)
+            {
+                // LSTM Cell has bias
+                const onnx::TensorProto& B = weights[node.input(3)];
+                fprintf(pp, "1=1");
+                fwrite_tensor_proto_data(B, bp);
+            }
+            else
+            {
+                fprintf(pp, "1=0");
+            }
         }
         else if (op == "MatMul")
         {

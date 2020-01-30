@@ -31,6 +31,7 @@ int Embed::load_param(const ParamDict& pd)
     input_dim = pd.get(1, 0);
     bias_term = pd.get(2, 0);
     weight_data_size = pd.get(3, 0);
+    axis = pd.get(4, 0);
 
     return 0;
 }
@@ -53,6 +54,10 @@ int Embed::load_model(const ModelBin& mb)
 
 int Embed::forward(const Mat& bottom_blob, Mat& top_blob, const Option& opt) const
 {
+    if (axis != 0)
+    {
+        return -100;
+    }
     int words = static_cast<int>(bottom_blob.total());
 
     top_blob.create(num_output, words, 4u, opt.blob_allocator);
