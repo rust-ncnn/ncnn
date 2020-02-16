@@ -2207,12 +2207,12 @@ int main(int argc, char** argv)
             {
                 // LSTM Cell has bias
                 const onnx::TensorProto& B = weights[node.input(3)];
-                fprintf(pp, "1=1");
+                fprintf(pp, " 2=1");
                 fwrite_tensor_proto_data(B, bp);
             }
             else
             {
-                fprintf(pp, "1=0");
+                fprintf(pp, " 2=0");
             }
         }
         else if (op == "MatMul")
@@ -2470,7 +2470,7 @@ int main(int argc, char** argv)
             {
                 fprintf(pp, ",%d", ends[i]);
             }
-            if (!axes.empty())
+            if (!axes.empty()) // axes = [0]
             {
                 fprintf(pp, " -23311=%zu", axes.size());
                 for (int i=0; i<(int)axes.size(); i++)
