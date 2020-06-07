@@ -453,6 +453,89 @@ int Convolution_arm::destroy_pipeline(const Option& opt)
     return 0;
 }
 
+int forward_int8_arm_pack(const Mat& bottom_blob, Mat& top_blob, const Option& opt) const
+{
+    size_t elemsize = bottom_blob.elemsize, elempack = bottom_blob.elempack;
+
+    Mat bottom_blob_unbordered = bottom_blob;
+    if (elemsize =! 1 || elempack != 8) {
+        // TODO implement  quatize int8pack8
+        Option opt_g = opt;
+        opt_g.blob_allocator = opt.workspace_allocator;
+
+        quantize_float32_to_int8(bottom_blob, bottom_blob_unbordered, bottom_blob_int8_scale, opt_g);
+    }
+
+    Mat bottom_blob_bordered;
+    make_padding(bottom_blob_unbordered, bottom_blob_bordered, opt);
+    if (bottom_blob_bordered.empty())
+    {
+        return -100;
+    }
+
+    const int maxk = kernel_w * kernel_h;
+    // kernel offsets
+    std::vector<int> _space_ofs(maxk);
+    int* space_ofs = &_space_ofs[0];
+    {
+        int p1 = 0;
+        int p2 = 0;
+        int gap = w * dilation_h - kernel_w * dilation_w;
+        for (int i = 0; i < kernel_h; i++)
+        {
+            for (int j = 0; j < kernel_w; j++)
+            {
+                space_ofs[p1] = p2;
+                p1++;
+                p2 += dilation_w;
+            }
+            p2 += gap;
+        }
+    }
+
+    size_t w = bottom_blob_bordered.w;
+    size_t h = bottom_blob_bordered.h;
+
+    const int outw = (w - kernel_w) / stride_w + 1;
+    const int outh = (h - kernel_h) / stride_h + 1;
+    int out_elempack;
+    size_t out_elemsize;
+
+    if (use_int8_requantize)
+    {
+        // out_elemsize = 1, out_pack = 8
+        out_elempack = bottom_blob_bordered.elempack;
+        out_elemsize = bottom_blob_bordered.elemsize;
+    } else {
+        // out_elemsize = 4, out_pack = 1
+        out_elempack = bottom_blob.elempack;
+        out_elemsize = bottom_blob.elemsize;
+    }
+    top_blob.create(outw, outh, num_output/ out_elempack, out_elemsize, out_elempack, opt.blob_allocator);
+
+    
+    const int maxk = kernel_w * kernel_h;
+    // kernel offsets
+    std::vector<int> _space_ofs(maxk);
+    int* space_ofs = &_space_ofs[0];
+    {
+        int p1 = 0;
+        int p2 = 0;
+        int gap = w * dilation_h - kernel_w * dilation_w;
+        for (int i = 0; i < kernel_h; i++)
+        {
+            for (int j = 0; j < kernel_w; j++)
+            {
+                space_ofs[p1] = p2;
+                p1++;
+                p2 += dilation_w;
+            }
+            p2 += gap;
+        }
+    }
+
+}
+
 int Convolution_arm::forward(const Mat& bottom_blob, Mat& top_blob, const Option& opt) const
 {
     if (bottom_blob.dims != 3)
@@ -491,7 +574,6 @@ int Convolution_arm::forward(const Mat& bottom_blob, Mat& top_blob, const Option
     int outh = (h - kernel_extent_h) / stride_h + 1;
     int out_elempack = (opt.use_packing_layout && num_output % 4 == 0) ? 4 : 1;
     size_t out_elemsize = elemsize / elempack * out_elempack;
-
     top_blob.create(outw, outh, num_output / out_elempack, out_elemsize, out_elempack, opt.blob_allocator);
     if (top_blob.empty())
         return -100;
@@ -1682,6 +1764,7 @@ int Convolution_arm::create_pipeline_int8_arm(const Option& opt)
     return 0;
 }
 
+
 int Convolution_arm::forward_int8_arm(const Mat& bottom_blob, Mat& top_blob, const Option& opt) const
 {
     if (dilation_w > 1 || dilation_h > 1)
@@ -1689,12 +1772,17 @@ int Convolution_arm::forward_int8_arm(const Mat& bottom_blob, Mat& top_blob, con
         return Convolution::forward(bottom_blob, top_blob, opt);
     }
 
+    if (opt.use_packing_layout)
+    {
+        return forward_int8_arm_pack(bottom_blob, top_blob, opt);
+    }
+
     int w = bottom_blob.w;
     int h = bottom_blob.h;
     // int channels = bottom_blob.c;
     size_t elemsize = bottom_blob.elemsize;
 
-//     NCNN_LOGE("Convolution_arm input %d x %d  ksize=%d %d  stride=%d %d", w, h, kernel_w, kernel_h, stride_w, stride_h);
+    NCNN_LOGE("Convolution_arm input %d x %d  ksize=%d %d  stride=%d %d", w, h, kernel_w, kernel_h, stride_w, stride_h);
 
     const int kernel_extent_w = dilation_w * (kernel_w - 1) + 1;
     const int kernel_extent_h = dilation_h * (kernel_h - 1) + 1;

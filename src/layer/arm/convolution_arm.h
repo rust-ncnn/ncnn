@@ -34,6 +34,7 @@ protected:
     int forward_bf16s(const Mat& bottom_blob, Mat& top_blob, const Option& opt) const;
     int create_pipeline_int8_arm(const Option& opt);
     int forward_int8_arm(const Mat& bottom_blob, Mat& top_blob, const Option& opt) const;
+    int forward_int8_arm_pack(const Mat& bottom_blob, Mat& top_blob, const Option& opt) const;
     int forwardDilation_arm(const Mat& bottom_blob, Mat& top_blob, const Option& opt) const;
 
 public:
