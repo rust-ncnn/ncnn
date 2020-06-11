@@ -60,6 +60,12 @@ public:
     Mat weight_data_pack4to1_bf16;
     Mat weight_data_bf16;
 
+    // pack8
+    Mat weight_data_pack8_int8;
+    Mat weight_requant_int32;
+    Mat weight_requant_shift_int32;
+    Mat bias_int32;
+
     // int8
     bool use_winograd3x3_int8;
     bool use_sgemm1x1_int8;

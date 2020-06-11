@@ -125,8 +125,6 @@ int Convolution_arm::create_pipeline(const Option& opt)
 
     if (opt.use_int8_inference && weight_data.elemsize == (size_t)1u)
     {
-        support_packing = false;
-
         return create_pipeline_int8_arm(opt);
     }
 
@@ -513,27 +511,92 @@ int forward_int8_arm_pack(const Mat& bottom_blob, Mat& top_blob, const Option& o
     }
     top_blob.create(outw, outh, num_output/ out_elempack, out_elemsize, out_elempack, opt.blob_allocator);
 
-    
-    const int maxk = kernel_w * kernel_h;
-    // kernel offsets
-    std::vector<int> _space_ofs(maxk);
-    int* space_ofs = &_space_ofs[0];
+    if (use_int8_requatize)
     {
-        int p1 = 0;
-        int p2 = 0;
-        int gap = w * dilation_h - kernel_w * dilation_w;
-        for (int i = 0; i < kernel_h; i++)
-        {
-            for (int j = 0; j < kernel_w; j++)
-            {
-                space_ofs[p1] = p2;
-                p1++;
-                p2 += dilation_w;
-            }
-            p2 += gap;
-        }
-    }
+        // outptr0[0]  = float2int8(((float)sum0 * scale_requant_in + bias0) * scale_requant_out);
+        // the equation could convert to:
+        //      out = float2int8( (float)sum * (scale_requant_in * scale_requant_out) + (bias * scale_requant_out) )
+        // prebuild the list of (scales_requant_in*scale_requant_out)
 
+        // std::vector<float> requantize_scales;
+        // for (int p=0; p<num_output; p++)
+        // {
+        //     float scale_in;
+        //     if (weight_data_int8_scales[p] == 0)
+        //         scale_in = 0;
+        //     else
+        //         scale_in = 1.f / (bottom_blob_int8_scale * weight_data_int8_scales[p]);
+
+        //     float scale_out = top_blob_int8_scale;
+
+        //     requantize_scales.push_back(scale_in);
+        //     requantize_scales.push_back(scale_out);
+        // }
+
+        // https://github.com/Tencent/ncnn/issues/1420
+        // TODO
+        // num_output
+        // #pragma omp parallel for num_threads(opt.num_threads)
+        for (int p=0; p<num_output / out_elempack; p++)
+        {
+            char* outptr = top_blob.channel(p);
+
+            for (int i = 0; i < outh; i++)
+            {
+                for (int j = 0; j < outw; j++)
+                {
+                    float32x4_t _sum = vdupq_n_f32(0.f);
+
+                    if (bias_term)
+                    {
+                        _sum = vld1q_f32(((const float*)bias_data) + p * 4);
+                    }
+
+                    const float* kptr = (const float*)weight_data_pack4 + maxk * channels * p * 16;
+
+                    // channels
+                    for (int q=0; q<channels; q++)
+                    {
+                        const Mat m = bottom_blob_bordered.channel(q);
+                        const float* sptr = m.row(i*stride_h) + j*stride_w * 4;
+
+                        for (int k = 0; k < maxk; k++) // 29.23
+                        {
+                            float32x4_t _val = vld1q_f32( sptr + space_ofs[k] * 4 );
+
+                            float32x4_t _w0 = vld1q_f32( kptr );
+                            float32x4_t _w1 = vld1q_f32( kptr + 4 );
+                            float32x4_t _w2 = vld1q_f32( kptr + 8 );
+                            float32x4_t _w3 = vld1q_f32( kptr + 12 );
+
+#if __aarch64__
+                            _sum = vmlaq_laneq_f32(_sum, _w0, _val, 0);
+                            _sum = vmlaq_laneq_f32(_sum, _w1, _val, 1);
+                            _sum = vmlaq_laneq_f32(_sum, _w2, _val, 2);
+                            _sum = vmlaq_laneq_f32(_sum, _w3, _val, 3);
+#else
+                            _sum = vmlaq_lane_f32(_sum, _w0, vget_low_f32(_val), 0);
+                            _sum = vmlaq_lane_f32(_sum, _w1, vget_low_f32(_val), 1);
+                            _sum = vmlaq_lane_f32(_sum, _w2, vget_high_f32(_val), 0);
+                            _sum = vmlaq_lane_f32(_sum, _w3, vget_high_f32(_val), 1);
+#endif
+
+                            kptr += 16;
+                        }
+                    }
+
+                    _sum = activation_ps(_sum, activation_type, activation_params);
+
+                    vst1q_f32(outptr + j * 4, _sum);
+                }
+
+                outptr += outw * 4;
+            }
+        }
+    } else
+    {
+        // TODO
+    }
 }
 
 int Convolution_arm::forward(const Mat& bottom_blob, Mat& top_blob, const Option& opt) const
@@ -582,7 +645,7 @@ int Convolution_arm::forward(const Mat& bottom_blob, Mat& top_blob, const Option
     {
         if (outw >= dilation_w && outh >= dilation_h)
         {
-        return forwardDilation_arm(bottom_blob_bordered, top_blob, opt);
+            return forwardDilation_arm(bottom_blob_bordered, top_blob, opt);
         }
     }
 
@@ -1734,6 +1797,88 @@ int Convolution_arm::forward_bf16s(const Mat& bottom_blob, Mat& top_blob, const 
 
 int Convolution_arm::create_pipeline_int8_arm(const Option& opt)
 {
+    if (opt.use_packing_layout) {
+        const int maxk = kernel_w * kernel_h;
+        const int num_input = weight_data_size / maxk / num_output;
+
+        int elempack, out_elempack;
+        if (use_int8_requantize) {
+            // src = kw-kh-inch-outch
+            // dst = 4b-4a-kw-kh-inch/4a-outch/4b
+            Mat weight_data_r2 = weight_data.reshape(maxk, num_input, num_output);
+
+            // pack 4A 4B
+            weight_data_pack8_int8.create(maxk, num_input/8, num_output/8, 64u, 64u);
+
+            for (int q=0; q+7<num_output; q+=8)
+            {
+                const Mat k0 = weight_data_r2.channel(q);
+                const Mat k1 = weight_data_r2.channel(q+1);
+                const Mat k2 = weight_data_r2.channel(q+2);
+                const Mat k3 = weight_data_r2.channel(q+3);
+                const Mat k4 = weight_data_r2.channel(q+4);
+                const Mat k5 = weight_data_r2.channel(q+5);
+                const Mat k6 = weight_data_r2.channel(q+6);
+                const Mat k7 = weight_data_r2.channel(q+7);
+
+                Mat g0 = weight_data_pack8_int8.channel(q/8);
+
+                for (int p=0; p+7<num_input; p+=8)
+                {
+#define SET_ROW_PTR(a)\
+                    const float* k##a##0 = k##a.row(p);\
+                    const float* k##a##1 = k##a.row(p+1);\
+                    const float* k##a##2 = k##a.row(p+2);\
+                    const float* k##a##3 = k##a.row(p+3);\
+                    const float* k##a##4 = k##a.row(p+4);\
+                    const float* k##a##5 = k##a.row(p+5);\
+                    const float* k##a##6 = k##a.row(p+6);\
+                    const float* k##a##7 = k##a.row(p+7);
+
+                    SET_ROW_PTR(0)
+                    SET_ROW_PTR(1)
+                    SET_ROW_PTR(2)
+                    SET_ROW_PTR(3)
+                    SET_ROW_PTR(4)
+                    SET_ROW_PTR(5)
+                    SET_ROW_PTR(6)
+                    SET_ROW_PTR(7)
+#undef SET_ROW_PTR
+
+                    unsigned short* g00 = g0.row<unsigned short>(p/8);
+
+                    for (int k=0; k<maxk; k++)
+                    {
+#define ASSIGN_VALUE(base,a)\
+                        g00[base + 0] = k0##a[k];\
+                        g00[base + 1] = k1##a[k];\
+                        g00[base + 2] = k2##a[k];\
+                        g00[base + 3] = k3##a[k];\
+                        g00[base + 4] = k4##a[k];\
+                        g00[base + 5] = k5##a[k];\
+                        g00[base + 6] = k6##a[k];\
+                        g00[base + 7] = k7##a[k];
+
+                        ASSIGN_VALUE(0, 0)
+                        ASSIGN_VALUE(8, 1)
+                        ASSIGN_VALUE(16, 2)
+                        ASSIGN_VALUE(24, 3)
+                        ASSIGN_VALUE(32, 4)
+                        ASSIGN_VALUE(40, 5)
+                        ASSIGN_VALUE(48, 6)
+                        ASSIGN_VALUE(56, 7)
+#define ASSIGN_VALUE
+
+                        g00 += 64;
+                    }
+                }
+            }
+        } else {
+            // TODO
+        }
+        return 0;
+    }
+
     const int maxk = kernel_w * kernel_h;
     const int num_input = weight_data_size / maxk / num_output;
 
