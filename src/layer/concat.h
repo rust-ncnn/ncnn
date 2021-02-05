@@ -30,6 +30,7 @@ public:
 
 public:
     int axis;
+    int int8_scale_term;
 };
 
 } // namespace ncnn

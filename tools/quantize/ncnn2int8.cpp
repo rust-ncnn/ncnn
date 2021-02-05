@@ -164,6 +164,7 @@ public:
     int quantize_convolution();
     int quantize_convolutiondepthwise();
     int quantize_innerproduct();
+    int quantize_concat();
 
 public:
     int fprintf_param_int_array(int id, const ncnn::Mat& m, FILE* pp);
@@ -178,6 +179,27 @@ public:
 NetQuantize::NetQuantize()
     : blobs(mutable_blobs()), layers(mutable_layers())
 {
+}
+
+int NetQuantize::quantize_concat()
+{
+    const int layer_count = static_cast<int>(layers.size());
+    for (int i = 0; i < layer_count; ++i)
+    {
+        if (layers[i]->type != "Concat")
+        {
+            continue;
+        }
+
+        std::map<std::string, std::vector<float> >::iterator iter_data = blob_int8scale_table.find(layers[i]->name);
+        if (iter_data == blob_int8scale_table.end())
+        {
+            continue;
+        }
+        ncnn::Concat* concat = (ncnn::Concat*)layers[i];
+        concat->int8_scale_term = 3;
+    }
+    return 0;
 }
 
 int NetQuantize::quantize_convolution()
@@ -566,6 +588,18 @@ int NetQuantize::save(const char* parampath, const char* binpath)
             ncnn::Concat* op_default = (ncnn::Concat*)layer_default;
 
             fprintf_param_value(" 0=%d", axis)
+
+            fprintf_param_value(" 1=%d", int8_scale_term)
+            if (op->int8_scale_term)
+            {
+                std::vector<float> blob_int8scale = blob_int8scale_table.at(layer->name);
+                if (blob_int8scale.size() != 1)
+                {
+                    fprintf(stderr, "too much concat scales\n");
+                }
+                // TODO  write scale value
+                fprintf_param_value(" 2=%f", blob_int8scale[0])
+            }
         }
         else if (layer->type == "Convolution")
         {
@@ -1308,6 +1342,7 @@ int main(int argc, char** argv)
     quantizer.quantize_convolutiondepthwise();
     quantizer.quantize_innerproduct();
 
+    quantizer.quantize_concat();
     quantizer.save(outparam, outbin);
 
     return 0;
