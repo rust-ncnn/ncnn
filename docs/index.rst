@@ -10,7 +10,7 @@ Welcome to ncnn's documentation!
 *Please select a specific version of the document in the lower left corner of the page.*
 
 .. toctree::
-  :maxdepth: 2
+  :maxdepth: 1 
   :caption: how to build
   :name: sec-introduction
 
@@ -19,7 +19,7 @@ Welcome to ncnn's documentation!
   how-to-build/build-mlir2ncnn
 
 .. toctree::
-  :maxdepth: 2
+  :maxdepth: 1
   :caption: benchmark
   :name: sec-benchmark
   
@@ -27,7 +27,7 @@ Welcome to ncnn's documentation!
   benchmark/vulkan-conformance-test
 
 .. toctree::
-  :maxdepth: 2
+  :maxdepth: 1
   :caption: developer guide
   :name: sec-dev-guide
 
@@ -53,7 +53,7 @@ Welcome to ncnn's documentation!
   
 
 .. toctree::
-  :maxdepth: 2
+  :maxdepth: 1
   :caption: FAQ
   :name: sec-FAQ
 
@@ -76,7 +76,7 @@ Welcome to ncnn's documentation!
   how-to-use-and-FAQ/vulkan-notes
 
 .. toctree::
-  :maxdepth: 2
+  :maxdepth: 1
   :caption: API reference
 
   api-reference/api
