@@ -21,9 +21,9 @@ from recommonmark.transform import AutoStructify
 
 # -- Project information -----------------------------------------------------
 
-project = 'Tengine'
-copyright = '2021, OPEN AI LAB'
-author = 'OPEN AI LAB'
+project = 'ncnn'
+copyright = '2021, tencent'
+author = 'tpoisonooo'
 
 # The full version, including alpha/beta/rc tags
 release = ''
