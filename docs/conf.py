@@ -14,6 +14,13 @@ import os
 import sys
 #sys.path.insert(0, os.path.abspath('.'))
 
+import subprocess, os
+
+read_the_docs_build = os.environ.get('READTHEDOCS', None) == 'True'
+
+if read_the_docs_build:
+    subprocess.call('cd ../doxygen; doxygen', shell=True)
+
 import sphinx_rtd_theme
 from recommonmark.parser import CommonMarkParser
 from recommonmark.transform import AutoStructify
@@ -25,6 +32,7 @@ project = 'ncnn'
 copyright = '2021, Tencent'
 author = 'tpoisonooo'
 
+
 # The full version, including alpha/beta/rc tags
 release = ''
 
@@ -34,7 +42,23 @@ release = ''
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
-extensions = ['recommonmark', 'sphinx_markdown_tables']
+# extensions = ['recommonmark', 'sphinx_markdown_tables']
+extensions = ['recommonmark', 'sphinx_markdown_tables', 'breathe']
+
+# # -- Exhale configuration ---------------------------------------------------
+# # Setup the breathe extension
+breathe_projects = {
+    "ncnn": "./xml"
+}
+breathe_default_project = "ncnn"
+# 
+# # Tell sphinx what the primary language being documented is.
+# primary_domain = 'cpp'
+# 
+# # Tell sphinx what the pygments highlight language should be.
+# highlight_language = 'cpp'
+# 
+# # exhale end
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
