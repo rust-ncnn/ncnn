@@ -17,13 +17,13 @@ Welcome to ncnn's documentation!
   how-to-build/how-to-build
   how-to-build/build-mlir2ncnn
   how-to-build/build-for-VS2017.zh
+  how-to-build/build-minimal-library
 
 .. toctree::
   :maxdepth: 1
   :caption: how to use 
   :name: sec-how-to-use
 
-  how-to-use-and-FAQ/build-minimal-library
   how-to-use-and-FAQ/efficient-roi-resize-rotate
   how-to-use-and-FAQ/FAQ-ncnn-produce-wrong-result
   how-to-use-and-FAQ/FAQ-ncnn-throw-error
