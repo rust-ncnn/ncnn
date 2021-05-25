@@ -22,7 +22,7 @@ from recommonmark.transform import AutoStructify
 # -- Project information -----------------------------------------------------
 
 project = 'ncnn'
-copyright = '2021, tencent'
+copyright = '2021, Tencent'
 author = 'tpoisonooo'
 
 # The full version, including alpha/beta/rc tags
