@@ -35,7 +35,7 @@ you may find more info on [use-ncnn-with-alexnet](use-ncnn-with-alexnet).
 
 Your network contains some operations that are not implemented in ncnn.
 
-You may implement them as custom layer followed in [how-to-implement-custom-layer-step-by-step](how-to-implement-custom-layer-step-by-step).
+You may implement them as custom layer followed in [how-to-implement-custom-layer-step-by-step](../developer-guide/how-to-implement-custom-layer-step-by-step).
 
 Or you could simply register them as no-op if you are sure those operations make no sense.
 
