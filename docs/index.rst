@@ -20,6 +20,26 @@ Welcome to ncnn's documentation!
 
 .. toctree::
   :maxdepth: 1
+  :caption: how to use 
+  :name: sec-how-to-use
+
+  how-to-use-and-FAQ/build-minimal-library
+  how-to-use-and-FAQ/efficient-roi-resize-rotate
+  how-to-use-and-FAQ/FAQ-ncnn-produce-wrong-result
+  how-to-use-and-FAQ/FAQ-ncnn-throw-error
+  how-to-use-and-FAQ/FAQ-ncnn-vulkan
+  how-to-use-and-FAQ/ncnn-load-model
+  how-to-use-and-FAQ/openmp-best-practice
+  how-to-use-and-FAQ/quantized-int8-inference
+  how-to-use-and-FAQ/use-ncnnoptimize-to-optimize-model
+  how-to-use-and-FAQ/use-ncnn-with-alexnet
+  how-to-use-and-FAQ/use-ncnn-with-opencv
+  how-to-use-and-FAQ/use-ncnn-with-own-project
+  how-to-use-and-FAQ/use-ncnn-with-pytorch-or-onnx
+  how-to-use-and-FAQ/vulkan-notes
+
+.. toctree::
+  :maxdepth: 1
   :caption: benchmark
   :name: sec-benchmark
   
@@ -47,27 +67,6 @@ Welcome to ncnn's documentation!
   developer-guide/param-and-model-file-structure
   developer-guide/tensorflow-op-combination
   
-
-.. toctree::
-  :maxdepth: 1
-  :caption: FAQ
-  :name: sec-FAQ
-
-  how-to-use-and-FAQ/build-minimal-library
-  how-to-use-and-FAQ/efficient-roi-resize-rotate
-  how-to-use-and-FAQ/FAQ-ncnn-produce-wrong-result
-  how-to-use-and-FAQ/FAQ-ncnn-throw-error
-  how-to-use-and-FAQ/FAQ-ncnn-vulkan
-  how-to-use-and-FAQ/ncnn-load-model
-  how-to-use-and-FAQ/openmp-best-practice
-  how-to-use-and-FAQ/quantized-int8-inference
-  how-to-use-and-FAQ/use-ncnnoptimize-to-optimize-model
-  how-to-use-and-FAQ/use-ncnn-with-alexnet
-  how-to-use-and-FAQ/use-ncnn-with-opencv
-  how-to-use-and-FAQ/use-ncnn-with-own-project
-  how-to-use-and-FAQ/use-ncnn-with-pytorch-or-onnx
-  how-to-use-and-FAQ/vulkan-notes
-
 .. toctree::
   :maxdepth: 1
   :caption: home

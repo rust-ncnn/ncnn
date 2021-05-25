@@ -19,7 +19,7 @@
 * [softmax](#softmax)
 * [tanh](#tanh)
 
-# absval
+## absval
 ```
 y = abs(x)
 ```
@@ -27,7 +27,7 @@ y = abs(x)
 * one_blob_only
 * support_inplace
 
-# argmax
+## argmax
 ```
 y = argmax(x, out_max_val, topk)
 ```
@@ -39,7 +39,7 @@ y = argmax(x, out_max_val, topk)
 |0|out_max_val|int|0|
 |1|topk|int|1|
 
-# batchnorm
+## batchnorm
 ```
 y = (x - mean) / sqrt(var + eps) * slope + bias
 ```
@@ -59,7 +59,7 @@ y = (x - mean) / sqrt(var + eps) * slope + bias
 |var_data|float|
 |bias_data|float|
 
-# bias
+## bias
 ```
 y = x + bias
 ```
@@ -75,7 +75,7 @@ y = x + bias
 |--|--|
 |bias_data|float|
 
-# binaryop
+## binaryop
  This operation is used for binary computation, and the calculation rule depends on the [broadcasting rule](https://github.com/Tencent/ncnn/wiki/binaryop-broadcasting).
 ```
 C = binaryop(A, B)
@@ -101,7 +101,7 @@ Operation type:
 - 7 = RSUB
 - 8 = RDIV
 
-# bnll
+## bnll
 ```
 y = log(1 + e^(-x)) , x > 0
 y = log(1 + e^x),     x < 0
@@ -110,7 +110,7 @@ y = log(1 + e^x),     x < 0
 * one_blob_only
 * support_inplace
 
-# cast
+## cast
 ```
 y = cast(x)
 ```
@@ -131,7 +131,7 @@ Element type:
 - 3 = int8
 - 4 = bfloat16
 
-# clip
+## clip
 ```
 y = clamp(x, min, max)
 ```
@@ -144,7 +144,7 @@ y = clamp(x, min, max)
 |0|min|float|-FLT_MAX|
 |1|max|float|FLT_MAX|
 
-# concat
+## concat
 ```
 y = concat(x0, x1, x2, ...) by axis
 ```
@@ -153,7 +153,7 @@ y = concat(x0, x1, x2, ...) by axis
 |--|--|--|--|
 |0|axis|int|0|
 
-# convolution
+## convolution
 ```
 x2 = pad(x, pads, pad_value)
 x3 = conv(x2, weight, kernel, stride, dilation) + bias
@@ -187,7 +187,7 @@ y = activation(x3, act_type, act_params)
 |weight_data|float/fp16/int8|
 |bias_data|float|
 
-# convolutiondepthwise
+## convolutiondepthwise
 ```
 x2 = pad(x, pads, pad_value)
 x3 = conv(x2, weight, kernel, stride, dilation, group) + bias
@@ -222,7 +222,7 @@ y = activation(x3, act_type, act_params)
 |weight_data|float/fp16/int8|
 |bias_data|float|
 
-# crop
+## crop
 ```
 y = crop(x)
 ```
@@ -244,7 +244,7 @@ y = crop(x)
 |10|ends|array|[ ]|
 |11|axes|array|[ ]|
 
-# dequantize
+## dequantize
 ```
 y = x * scale + bias
 ```
@@ -258,7 +258,7 @@ y = x * scale + bias
 |1|bias_term|int|0|
 |2|bias_data_size|int|0|
 
-# lstm
+## lstm
 Apply a single-layer LSTM to a feature sequence of `T` timesteps. The input blob shape is `[w=input_size, h=T]` and the output blob shape is `[w=num_output, h=T]`.
 
 * one_blob_only
@@ -275,7 +275,7 @@ Apply a single-layer LSTM to a feature sequence of `T` timesteps. The input blob
 |bias_c_data|float|`[w=num_output, h=4, c=num_directions]`||
 |weight_hc_data|float|`[w=num_output, h=num_output * 4, c=num_directions]`||
 
-# pooling
+## pooling
 
 ```
 x2 = pad(x, pads)
@@ -296,7 +296,7 @@ x3 = pooling(x2, kernel, stride)
 | 14       | pad_right      | int  | pad_left |                                                                                                                                     |
 | 15       | pad_bottom     | int  | pad_top  |                                                                                                                                     |
 
-# sigmoid
+## sigmoid
 ```
 y = 1 / (1 + exp(-x))
 ```
@@ -304,7 +304,7 @@ y = 1 / (1 + exp(-x))
 * one_blob_only
 * support_inplace
 
-# softmax
+## softmax
 ```
 softmax(x, axis)
 ```
@@ -317,7 +317,7 @@ softmax(x, axis)
 |0|axis|int|0||
 |1|fixbug0|int|0|hack for bug fix, should be 1|
 
-# tanh
+## tanh
 ```
 y = tanh(x)
 ```

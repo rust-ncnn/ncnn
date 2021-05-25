@@ -1,3 +1,5 @@
+# FAQ ncnn throw error
+
 ### param is too old, please regenerate
 
 Your model file is being the old format converted by an old caffe2ncnn tool.

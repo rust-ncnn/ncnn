@@ -1,3 +1,5 @@
+# FAQ ncnn vulkan
+
 ### how to enable ncnn vulkan capability
 
 follow [the build and install instruction](../how-to-build/how-to-build)
