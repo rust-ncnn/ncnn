@@ -16,6 +16,7 @@ Welcome to ncnn's documentation!
 
   how-to-build/how-to-build
   how-to-build/build-mlir2ncnn
+  how-to-build/build-for-VS2017.zh
 
 .. toctree::
   :maxdepth: 1
