@@ -25,14 +25,17 @@ Welcome to ncnn's documentation!
   :name: sec-how-to-use
 
   how-to-use-and-FAQ/efficient-roi-resize-rotate
+  how-to-use-and-FAQ/FAQ-ncnn-protobuf-problem.zh
   how-to-use-and-FAQ/FAQ-ncnn-produce-wrong-result
   how-to-use-and-FAQ/FAQ-ncnn-throw-error
   how-to-use-and-FAQ/FAQ-ncnn-vulkan
   how-to-use-and-FAQ/ncnn-load-model
   how-to-use-and-FAQ/openmp-best-practice
+  how-to-use-and-FAQ/openmp-best-practice.zh
   how-to-use-and-FAQ/quantized-int8-inference
   how-to-use-and-FAQ/use-ncnnoptimize-to-optimize-model
   how-to-use-and-FAQ/use-ncnn-with-alexnet
+  how-to-use-and-FAQ/use-ncnn-with-alexnet.zh
   how-to-use-and-FAQ/use-ncnn-with-opencv
   how-to-use-and-FAQ/use-ncnn-with-own-project
   how-to-use-and-FAQ/use-ncnn-with-pytorch-or-onnx
@@ -52,6 +55,7 @@ Welcome to ncnn's documentation!
   :name: sec-dev-guide
 
   developer-guide/aarch64-mix-assembly-and-intrinsic
+  developer-guide/add-custom-layer.zh
   developer-guide/arm-a53-a55-dual-issue
   developer-guide/armv7-mix-assembly-and-intrinsic
   developer-guide/binaryop-broadcasting
@@ -59,11 +63,14 @@ Welcome to ncnn's documentation!
   developer-guide/element-packing
   developer-guide/how-to-implement-custom-layer-step-by-step
   developer-guide/how-to-write-a-neon-optimized-op-kernel
+  developer-guide/how-to-be-a-contributor.zh
   developer-guide/low-level-operation-api
+  developer-guide/ncnn-tips-and-tricks.zh
   developer-guide/new-model-load-api
   developer-guide/new-param-load-api
   developer-guide/operation-param-weight-table
   developer-guide/operators
+  developer-guide/preload-practice.zh
   developer-guide/param-and-model-file-structure
   developer-guide/tensorflow-op-combination
   
