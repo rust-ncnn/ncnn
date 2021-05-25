@@ -70,7 +70,9 @@ Welcome to ncnn's documentation!
 
 .. toctree::
   :maxdepth: 1
-  :caption: API reference
+  :caption: home
 
-  api-reference/api
+  home
+  faq
+  application-with-ncnn-inside
 
