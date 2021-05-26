@@ -48,9 +48,9 @@ extensions = ['recommonmark', 'sphinx_markdown_tables', 'breathe']
 # # -- Exhale configuration ---------------------------------------------------
 # # Setup the breathe extension
 breathe_projects = {
-    "ncnn": "./xml"
+    "doc-ncnn": "./xml"
 }
-breathe_default_project = "ncnn"
+breathe_default_project = "doc-ncnn"
 # 
 # # Tell sphinx what the primary language being documented is.
 # primary_domain = 'cpp'

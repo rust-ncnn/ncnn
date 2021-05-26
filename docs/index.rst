@@ -83,14 +83,17 @@ Welcome to ncnn's documentation!
   application-with-ncnn-inside
 
 .. toctree::
-  :maxdepth: 1
+  :maxdepth: 2 
   :caption: api document 
+  :name: api
 
+  api/api
+
+.. doxygenindex::
 .. doxygenfunction::
 .. doxygenstruct::
 .. doxygenenum::
 .. doxygentypedef::
-.. doxygenclass:: ncnn
-    :project: ncnn
-    :path: ./xml
-
+.. doxygenclass::
+    :project: doc-ncnn
+    :path: ../../xml/
