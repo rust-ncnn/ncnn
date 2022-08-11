@@ -476,7 +476,6 @@ int NetQuantize::quantize_layernorm()
     return 0;
 }
 
-
 int NetQuantize::quantize_binaryop()
 {
     const int layer_count = static_cast<int>(layers.size());
@@ -487,7 +486,7 @@ int NetQuantize::quantize_binaryop()
         // find add layer
         if (layers[i]->type != "BinaryOp")
             continue;
-    
+
         ncnn::BinaryOp* op = (ncnn::BinaryOp*)layers[i];
 
         if (op->bottoms.size() != 2)
@@ -512,7 +511,7 @@ int NetQuantize::quantize_binaryop()
             }
             op->in_scale0 = scales[0];
             op->in_scale1 = scales[1];
-            
+
             op->out_scale = table->get<float>("output_scale");
             if (std::abs(op->out_scale) <= 1e-6)
             {
@@ -741,7 +740,7 @@ int NetQuantize::fuse_conv_requantize()
 
 /**
  * @brief if [LayerNorm --> X] and X is a type of quantizable layer, then requant layernorm.output, AKA X.input is quantized tensor
- * 
+ *
  * @return int
  */
 int NetQuantize::fuse_layernorm_requantize()
@@ -786,23 +785,23 @@ int NetQuantize::fuse_layernorm_requantize()
 
 /**
  * @brief
- * 
+ *
  * if all of output is quantized, binaryop use requant
  * if none of input and output can be quantize, binaryop skip quant
- * 
- * @return int 
+ *
+ * @return int
  */
 int NetQuantize::fuse_binaryop_requantize()
 {
     const size_t layer_count = layers.size();
 
-    auto direct_connected_outputs = [&](ncnn::Layer* op, int cur) -> std::vector<ncnn::Layer*>
-    {
+    auto direct_connected_outputs = [&](ncnn::Layer* op, int cur) -> std::vector<ncnn::Layer*> {
         std::vector<ncnn::Layer*> outputs;
-        for (size_t j = cur; j <layer_count; ++j)
+        for (size_t j = cur; j < layer_count; ++j)
         {
             ncnn::Layer* next = layers[j];
-            for (auto index: next->bottoms) {
+            for (auto index : next->bottoms)
+            {
                 if (index == op->tops[0] || index == op->tops[1])
                 {
                     outputs.emplace_back(next);
@@ -813,11 +812,10 @@ int NetQuantize::fuse_binaryop_requantize()
         return outputs;
     };
 
-    auto all_outputs =  [&](ncnn::BinaryOp* op, int cur) -> std::vector<ncnn::Layer*>
-    {
+    auto all_outputs = [&](ncnn::BinaryOp* op, int cur) -> std::vector<ncnn::Layer*> {
         auto directs = direct_connected_outputs(op, cur);
         std::vector<ncnn::Layer*> outputs;
-        for (auto node: directs)
+        for (auto node : directs)
         {
             if (node->type == "Split")
             {
@@ -830,13 +828,13 @@ int NetQuantize::fuse_binaryop_requantize()
         return outputs;
     };
 
-    auto direct_connected_inputs = [=](ncnn::Layer* op, int cur) -> std::vector<ncnn::Layer*>
-    {
+    auto direct_connected_inputs = [=](ncnn::Layer* op, int cur) -> std::vector<ncnn::Layer*> {
         std::vector<ncnn::Layer*> inputs;
-        for (size_t j = 0; j <cur; ++j)
+        for (size_t j = 0; j < cur; ++j)
         {
             ncnn::Layer* last = layers[j];
-            for (auto index: last->tops) {
+            for (auto index : last->tops)
+            {
                 if (index == op->bottoms[0] || index == op->bottoms[1])
                 {
                     inputs.emplace_back(last);
@@ -847,11 +845,10 @@ int NetQuantize::fuse_binaryop_requantize()
         return inputs;
     };
 
-    auto all_inputs =  [&](ncnn::BinaryOp* op, int cur) -> std::vector<ncnn::Layer*>
-    {
+    auto all_inputs = [&](ncnn::BinaryOp* op, int cur) -> std::vector<ncnn::Layer*> {
         auto directs = direct_connected_inputs(op, cur);
         std::vector<ncnn::Layer*> inputs;
-        for (auto node: directs)
+        for (auto node : directs)
         {
             if (node->type == "Split")
             {
@@ -864,35 +861,34 @@ int NetQuantize::fuse_binaryop_requantize()
         return inputs;
     };
 
-    auto is_quantized = [=](ncnn::Layer* layer) -> bool
-    {
-            if (layer->type == "Convolution")
-                return ((ncnn::Convolution*)layer)->int8_scale_term > 0;
+    auto is_quantized = [=](ncnn::Layer* layer) -> bool {
+        if (layer->type == "Convolution")
+            return ((ncnn::Convolution*)layer)->int8_scale_term > 0;
 
-            if (layer->type == "MultiHeadAttention")
-                return ((ncnn::MultiHeadAttention*)layer)->int8_scale_term > 0;
+        if (layer->type == "MultiHeadAttention")
+            return ((ncnn::MultiHeadAttention*)layer)->int8_scale_term > 0;
 
-            if (layer->type == "InnerProduct")
-                return ((ncnn::InnerProduct*)layer)->int8_scale_term > 0;
-            
-            if (layer->type == "ConvolutionDepthWise")
-                return ((ncnn::ConvolutionDepthWise*)layer)->int8_scale_term > 0;
+        if (layer->type == "InnerProduct")
+            return ((ncnn::InnerProduct*)layer)->int8_scale_term > 0;
 
-            if (layer->type == "LayerNorm")
+        if (layer->type == "ConvolutionDepthWise")
+            return ((ncnn::ConvolutionDepthWise*)layer)->int8_scale_term > 0;
+
+        if (layer->type == "LayerNorm")
             return ((ncnn::LayerNorm*)layer)->int8_scale_term > 0;
 
-            if (layer->type == "BinaryOp")
-                // suppose that future binaryop could be quantized
-                return true;
+        if (layer->type == "BinaryOp")
+            // suppose that future binaryop could be quantized
+            return true;
 
-            return false;
+        return false;
     };
-    
+
     for (size_t i = 0; i < layer_count; i++)
     {
         if (layers[i]->type != "BinaryOp")
             continue;
-        
+
         ncnn::BinaryOp* op = (ncnn::BinaryOp*)layers[i];
 
         if (op->int8_scale_term == 0)
@@ -908,17 +904,18 @@ int NetQuantize::fuse_binaryop_requantize()
         // if none of nodes could be quantized, give up quantize binaryop
         bool non_can_quantize = true;
 
-        for (ncnn::Layer* node: outputs)
+        for (ncnn::Layer* node : outputs)
         {
             if (is_quantized(node))
             {
                 non_can_quantize = false;
-            } else
+            }
+            else
             {
                 all_output_support_quant = false;
             }
         }
-        for (ncnn::Layer* node: inputs)
+        for (ncnn::Layer* node : inputs)
         {
             if (is_quantized(node))
             {
@@ -930,13 +927,17 @@ int NetQuantize::fuse_binaryop_requantize()
         {
             // enable requant
             op->int8_scale_term += 100;
-        } else if (non_can_quantize){
+        }
+        else if (non_can_quantize)
+        {
             // cancel quant
             op->int8_scale_term = 0;
             op->in_scale0 = 1.f;
             op->in_scale1 = 1.f;
             op->out_scale = 1.f;
-        } else {
+        }
+        else
+        {
             op->int8_scale_term = 1;
         }
         fprintf(stderr, "quantize_binaryop %s int8_scale_term %d\n", op->name.c_str(), op->int8_scale_term);
