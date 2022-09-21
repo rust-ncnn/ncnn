@@ -38,7 +38,6 @@ static int detect_squeezenet(const cv::Mat& bgr)
     if (squeezenet.load_model("out.bin"))
         exit(-1);
 
-
     ncnn::Mat in = ncnn::Mat::from_pixels_resize(bgr.data, ncnn::Mat::PIXEL_BGR, bgr.cols, bgr.rows, 2048, 1024);
 
     const float mean_vals[3] = {104.f, 117.f, 123.f};
