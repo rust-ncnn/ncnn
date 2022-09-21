@@ -65,6 +65,7 @@ int Pooling_x86::forward(const Mat& bottom_blob, Mat& top_blob, const Option& op
     // max value in NxN window
     // avg value in NxN window
 
+    fprintf(stdout, "%s input whc %d %d %d \n", name.c_str(), bottom_blob.w, bottom_blob.h, bottom_blob.c);
     if (adaptive_pooling)
     {
         return Pooling::forward(bottom_blob, top_blob, opt);

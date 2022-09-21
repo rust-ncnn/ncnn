@@ -29,12 +29,15 @@ static int detect_squeezenet(const cv::Mat& bgr)
     ncnn::Net squeezenet;
 
     squeezenet.opt.use_vulkan_compute = false;
-
+    squeezenet.opt.use_packing_layout = false;
     // the ncnn model https://github.com/nihui/ncnn-assets/tree/master/models
-    if (squeezenet.load_param("end2end_int8.param"))
+    // if (squeezenet.load_param("end2end.param"))
+    if (squeezenet.load_param("out.param"))
         exit(-1);
-    if (squeezenet.load_model("end2end_int8.bin"))
+    // if (squeezenet.load_model("end2end.bin"))
+    if (squeezenet.load_model("out.bin"))
         exit(-1);
+
 
     ncnn::Mat in = ncnn::Mat::from_pixels_resize(bgr.data, ncnn::Mat::PIXEL_BGR, bgr.cols, bgr.rows, 2048, 1024);
 

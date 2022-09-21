@@ -740,6 +740,11 @@ int Convolution_x86::forward(const Mat& bottom_blob, Mat& top_blob, const Option
 #if NCNN_INT8
     if (opt.use_int8_inference && int8_scale_term)
     {
+        if (name == "Conv_60")
+        {
+            fprintf(stdout, "break \n");
+        }
+
         return forward_int8_x86(bottom_blob, top_blob, opt);
     }
 #endif
