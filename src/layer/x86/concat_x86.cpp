@@ -110,7 +110,7 @@ int Concat_x86::forward(const std::vector<Mat>& bottom_blobs, std::vector<Mat>& 
         for (size_t b = 0; b < bottom_blobs.size(); b++)
         {
             const Mat& bottom_blob = bottom_blobs[b];
-            
+
             if (bottom_blob.elempack == 4 && elempack == 1)
             {
                 for (int i = 0; i < bottom_blob.h; i++)
