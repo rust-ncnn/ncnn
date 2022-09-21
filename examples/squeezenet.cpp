@@ -54,7 +54,6 @@ static int detect_squeezenet(const cv::Mat& bgr)
     return 0;
 }
 
-
 int main(int argc, char** argv)
 {
     const char* imagepath = argv[1];
